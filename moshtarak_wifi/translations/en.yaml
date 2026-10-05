@@ -1,0 +1,18 @@
+configuration:
+  moshtarak_wifi:
+    name: Moshtarak WiFi
+    options:
+      mode: auto
+      poll: 5
+      protect: ""
+      protect_by_device: ""
+      history_interval: 20
+      history_keep_h: 48
+    schema:
+      mode: list(auto|tcp|sim)?
+      poll: int(1,3600)?
+      protect: str?
+      protect_by_device: str?
+      history_interval: int(5,3600)?
+      history_keep_h: float(0.1,8760)?
+network: {}

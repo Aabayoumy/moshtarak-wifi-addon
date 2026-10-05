@@ -1,0 +1,53 @@
+---
+name: Moshtarak WiFi (TONLY / LG-U+ MTTL-W01)
+version: "1.0.0"
+slug: moshtarak_wifi
+description: >-
+  Controls TONLY / LG-U+ MTTL-W01 four-socket Wi-Fi power strips over the
+  strip's undocumented callback protocol.
+url: https://github.com/Aabayoumy/moshtarak-wifi-addon
+arch:
+  - amd64
+  - aarch64
+  - armv7
+startup: application
+boot: auto
+homeassistant_api: false
+hassio_api: false
+host_network: false
+ingress: false
+stdin: false
+map:
+  - config:rw
+# The strip DIALS OUT to TCP 10086 and holds the socket open; it never accepts
+# an inbound connection. This is therefore the one port that must be reachable
+# from the LAN, and it is only opened for that reason.
+#
+# The controller's HTTP API (8099) is deliberately NOT published. It has no
+# authentication of any kind, so exposing it would let any device on the LAN
+# drive the strip. Home Assistant reaches it over the add-on's internal
+# network instead, where nothing else lives.
+ports:
+  10086/tcp: 10086
+# /api/health answers 200 even with zero strips connected, so this cannot
+# restart-loop a fresh install that has no hardware yet.
+watchdog: http://[HOST]:8099/api/health
+panel_icon: mdi:power-socket-us
+options:
+  mode: auto
+  poll: 5
+  protect: ""
+  protect_by_device: ""
+  history_interval: 20
+  history_keep_h: 48
+schema:
+  mode: list(auto|tcp|sim)?
+  poll: int(1,3600)?
+  protect: str?
+  protect_by_device: str?
+  history_interval: int(5,3600)?
+  history_keep_h: float(0.1,8760)?
+# No `image:` key on purpose. Setting it would make the Supervisor try to PULL a
+# published image instead of building the Dockerfile next to this file. Once
+# images are actually built and pushed to ghcr.io, adding it becomes a valid
+# optimisation - until then it is a guaranteed install failure.
