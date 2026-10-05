@@ -45,14 +45,15 @@ RUN python3 -m py_compile /opt/moshtarak-wifi/server.py /opt/moshtarak-wifi/adap
 #      (a base image is free to ship a trimmed Python);
 #   3. the controller's HTTP server can actually bind a socket as this user, so
 #      a missing capability shows up here rather than as a restart loop.
+#
+# Each check is one physical line on purpose. Docker continues a RUN only on an
+# explicit backslash, so a multi-line `python3 -c "..."` does not parse: the
+# second line is read as a fresh instruction and the build dies with
+# "dockerfile parse error ... unknown instruction: import". That is not
+# hypothetical - it is what an earlier version of this file did, and it was
+# only caught because the image was actually built rather than eyeballed.
 RUN su moshtarak -c 'python3 -c "import json, os, re, socket, socketserver, sqlite3, sys, threading, time; from http.server import ThreadingHTTPServer; print(\"stdlib ok\")"' \
- && su moshtarak -c 'python3 -c "
-import socket
-s = socket.socket()
-s.bind((\"127.0.0.1\", 0))
-print(\"can bind:\", s.getsockname()[1])
-s.close()
-"'
+ && su moshtarak -c 'python3 -c "import socket; s = socket.socket(); s.bind((\"127.0.0.1\", 0)); print(\"can bind:\", s.getsockname()[1]); s.close()"'
 
 WORKDIR /opt/moshtarak-wifi
 USER moshtarak

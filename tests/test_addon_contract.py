@@ -42,8 +42,17 @@ except ImportError:
 ADDON = Path(__file__).resolve().parent.parent / "moshtarak_wifi"
 CONFIG_YAML = ADDON / "config.yaml"
 RUN_SH = ADDON / "run.sh"
+DOCKERFILE = ADDON / "Dockerfile"
 SERVER = ADDON / "rootfs" / "server.py"
 ADAPTERS = ADDON / "rootfs" / "adapters.py"
+
+# Every instruction the add-on's Dockerfile is allowed to use. Anything else in
+# instruction position means the file does not parse.
+DOCKER_INSTRUCTIONS = {
+    "ADD", "ARG", "CMD", "COPY", "ENTRYPOINT", "ENV", "EXPOSE", "FROM",
+    "HEALTHCHECK", "LABEL", "MAINTAINER", "ONBUILD", "RUN", "SHELL",
+    "STOPSIGNAL", "USER", "VOLUME", "WORKDIR",
+}
 
 # A port nothing else in this test run is likely to hold.
 TEST_PORT = 8477
@@ -245,7 +254,6 @@ def main() -> int:
         shutil.rmtree(run_dir, ignore_errors=True)
 
     print("\n6. config.yaml is valid for a Supervisor add-on")
-
     for required in ("name", "version", "slug", "description", "arch", "startup"):
         check(required in cfg, f"config.yaml declares {required}")
     check(
@@ -260,6 +268,56 @@ def main() -> int:
     check(
         "watchdog" in cfg,
         "watchdog is set",
+    )
+
+    print("\n7. the Dockerfile parses")
+
+    # A Dockerfile that does not parse is invisible to every other check here
+    # and to `yaml.safe_load`, but it is fatal at install time - and the install
+    # happens on the user's machine, minutes after they click. The failure that
+    # motivated this was a multi-line `python3 -c "..."` inside a RUN: Docker
+    # continues a line only on an explicit backslash, so the following line was
+    # read as an instruction and the build died with
+    #   "dockerfile parse error on line 50: unknown instruction: import"
+    #
+    # So join continuations, then require every remaining logical line to begin
+    # with a real Dockerfile instruction.
+    raw = DOCKERFILE.read_text().splitlines()
+    logical: list[tuple[int, str]] = []
+    pending, start = "", 0
+    for number, line in enumerate(raw, start=1):
+        stripped = line.strip()
+        if not pending:
+            start = number
+        if stripped.endswith("\\"):
+            pending += stripped[:-1] + " "
+            continue
+        logical.append((start, (pending + line).strip()))
+        pending = ""
+
+    if pending:
+        check(False, "Dockerfile has no line ending in a trailing backslash",
+              f"starts at line {start}")
+
+    for number, line in logical:
+        if not line or line.startswith("#"):
+            continue
+        word = line.split()[0].upper()
+        check(
+            word in DOCKER_INSTRUCTIONS,
+            f"Dockerfile line {number} starts with an instruction",
+            f"got {line[:70]!r}, which would be a parse error at build time",
+        )
+
+    # And the specific trap, called out on its own so it cannot regress quietly.
+    multi_line_python = [
+        (n, ln) for n, ln in enumerate(raw, start=1)
+        if re.search(r"""python3?\s+-c\s+["'][^"']*$""", ln.rstrip())
+    ]
+    check(
+        not multi_line_python,
+        "no `python -c \"...` left open at end of line in the Dockerfile",
+        f"lines {[n for n, _ in multi_line_python]} need to stay on one physical line",
     )
 
     print(f"\n{passed} passed, {len(failed)} failed")
