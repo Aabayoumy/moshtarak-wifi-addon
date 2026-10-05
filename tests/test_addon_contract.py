@@ -373,6 +373,45 @@ def main() -> int:
         "state dir is on the mapped /config path, so history.db is backed up",
     )
 
+    print("\n9. s6-overlay can become PID 1")
+
+    # This one cost two failed installs and a great deal of archaeology.
+    #
+    # The Home Assistant base image sets ENTRYPOINT ["/init"] (s6-overlay v3).
+    # s6-overlay only works as a genuine PID 1, and hands the container CMD to
+    # `s6-overlay-suexec`, which refuses to run as anything else. The Supervisor
+    # passes the app's `init` key straight to Docker's --init flag and DEFAULTS
+    # IT TO TRUE, so Docker injects tini as PID 1, /init becomes a child of
+    # tini, and the app dies instantly with:
+    #     s6-overlay-suexec: fatal: can only run as pid 1
+    #
+    # Nothing in the Dockerfile hints at this, and the failure message names
+    # neither Docker nor the Supervisor. So assert it here.
+    check(
+        cfg.get("init") is False,
+        "config.yaml sets `init: false`",
+        "omitted or truthy means Docker injects tini as PID 1 and s6-overlay's "
+        "/init can never run, so the app will not start",
+    )
+
+    # If the Dockerfile ever sets its own ENTRYPOINT it would replace /init
+    # outright and skip s6 supervision entirely.
+    entrypoint_lines = [
+        (n, ln) for n, ln in enumerate(raw, start=1)
+        if re.match(r"\s*ENTRYPOINT\s+\S", ln, re.IGNORECASE)
+    ]
+    check(
+        not entrypoint_lines,
+        "Dockerfile overrides no ENTRYPOINT (the base image's /init must stay)",
+        f"lines {[n for n, _ in entrypoint_lines]}",
+    )
+
+    # A CMD is fine and is what s6-overlay expects to hand off to.
+    check(
+        any(re.match(r"\s*CMD\s+\[", ln) for ln in raw),
+        "Dockerfile declares an exec-form CMD for s6-overlay to run",
+    )
+
     print(f"\n{passed} passed, {len(failed)} failed")
     if failed:
         print("\nFAILED:")

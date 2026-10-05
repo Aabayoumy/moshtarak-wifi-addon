@@ -41,3 +41,31 @@ Fixes found by actually installing the app rather than reading the Dockerfile.
   inside the build and requires a 200 from `/api/health`, checks that the mode
   reached it from the environment, and fails the build if the measured
   socket→channel order is not `[2, 3, 4, 1]`.
+
+## 1.0.2
+
+- **The app still would not start**, even at 1.0.1. This was the real cause, and
+  it was not in the Dockerfile at all.
+
+  The Home Assistant base image sets `ENTRYPOINT ["/init"]`, which is
+  s6-overlay v3. s6-overlay only functions when it genuinely is PID 1: it
+  installs signal handlers, reaps zombies, and hands the container `CMD` to
+  `s6-overlay-suexec`, which refuses to run as anything else.
+
+  The Supervisor passes an app's `init` key straight through to Docker's
+  `--init` flag, and it **defaults to true**. With `--init`, Docker injects
+  tini as PID 1, so `/init` runs as a child of tini and the app died on every
+  start with `s6-overlay-suexec: fatal: can only run as pid 1`. Setting
+  `init: false` stops Docker injecting anything, `/init` becomes PID 1, and the
+  CMD runs under s6 supervision as intended. Core add-ons that ship a main
+  daemon — mosquitto among them — set this too.
+
+  Worth recording honestly: removing `USER` in 1.0.1 was a real bug (see below)
+  but it was not the cause of the startup failure, and the app failed
+  identically with it gone. Two plausible-sounding fixes in a row, and neither
+  was the answer, is what sent me reading the base image's actual `Entrypoint`
+  from the registry instead of reasoning about it.
+
+- `tests/test_addon_contract.py` asserts `init: false`, that no `ENTRYPOINT` is
+  overridden, and that an exec-form `CMD` exists — 3 more checks aimed at exactly
+  this failure.

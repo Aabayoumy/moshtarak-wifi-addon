@@ -1,6 +1,6 @@
 ---
 name: Moshtarak WiFi (TONLY / LG-U+ MTTL-W01)
-version: "1.0.1"
+version: "1.0.2"
 slug: moshtarak_wifi
 description: >-
   Controls TONLY / LG-U+ MTTL-W01 four-socket Wi-Fi power strips over the
@@ -12,6 +12,26 @@ arch:
   - armv7
 startup: application
 boot: auto
+# MUST be false, and this is not cosmetic.
+#
+# The Home Assistant base image sets ENTRYPOINT ["/init"], which is s6-overlay
+# v3. s6-overlay only works when it genuinely is PID 1: it installs signal
+# handlers, reaps zombies and hands off to the container CMD through
+# `s6-overlay-suexec`, which refuses to run as anything other than PID 1.
+#
+# This Supervisor passes `init` straight through to Docker's `--init` flag, and
+# it DEFAULTS TO TRUE. With --init, Docker injects tini as PID 1, so /init runs
+# as a child of tini, and the app died on every start with:
+#
+#     s6-overlay-suexec: fatal: can only run as pid 1
+#
+# Setting init: false stops Docker injecting anything, /init becomes PID 1, and
+# the CMD runs under s6 supervision as intended. Every core add-on that ships a
+# main daemon (mosquitto, and the rest) sets this too.
+#
+# Note that removing USER from the Dockerfile fixed a related symptom of the
+# same misunderstanding, but the app still would not start until this was set.
+init: false
 homeassistant_api: false
 hassio_api: false
 host_network: false
