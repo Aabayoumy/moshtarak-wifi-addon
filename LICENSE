@@ -19,13 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-The files moshtarak_wifi/rootfs/server.py and moshtarak_wifi/rootfs/adapters.py
-are the work of Karim Elrashedy and are redistributed here with his permission.
-They are used unmodified. See NOTICE.md for the full attribution, the
-provenance of the protocol implementation, and the questions that arise from
-redistributing it.
-
-The files under tests/ are Karim's test suites, also unmodified.
