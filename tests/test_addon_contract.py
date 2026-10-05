@@ -320,6 +320,59 @@ def main() -> int:
         f"lines {[n for n, _ in multi_line_python]} need to stay on one physical line",
     )
 
+    print("\n8. the app will actually start, not merely build")
+
+    # No USER instruction. s6-overlay v3 - which the Home Assistant base images
+    # use - has to start as root so it can set up supervision and drop
+    # privileges itself. A Dockerfile that sets USER produced an app that built
+    # cleanly, installed cleanly, and then died on every start with
+    #   s6-overlay-suexec: fatal: can only run as pid 1
+    # which is not a message anyone would connect to a USER line.
+    user_lines = [
+        (n, ln) for n, ln in enumerate(raw, start=1)
+        if re.match(r"\s*USER\s+\S", ln, re.IGNORECASE)
+    ]
+    check(
+        not user_lines,
+        "Dockerfile sets no USER (s6-overlay v3 must start as root)",
+        f"lines {[n for n, _ in user_lines]}",
+    )
+
+    # Nor a `su <somebody> -c` in a RUN: with no such runtime user that fails the
+    # build for a reason that reads like a permissions problem rather than a
+    # leftover from the abandoned unprivileged design.
+    su_lines = [
+        (n, ln) for n, ln in enumerate(raw, start=1)
+        if re.search(r"\bsu\s+\w+\s+-c\b", ln)
+    ]
+    check(
+        not su_lines,
+        "Dockerfile runs nothing through `su <user> -c`",
+        f"lines {[n for n, _ in su_lines]}",
+    )
+
+    # The build gate must exist AND be invoked, or the checks above are only
+    # checking the Dockerfile that was written, not the image it produces.
+    gate = ADDON / "build_verify.py"
+    check(gate.is_file(), "build_verify.py is present")
+    if gate.is_file():
+        check(
+            "build_verify.py" in DOCKERFILE.read_text(),
+            "the Dockerfile COPYs build_verify.py, so the gate actually runs",
+        )
+        check(
+            re.search(r"python3\s+/tmp/build_verify\.py.*rm\s+-f\s+/tmp/build_verify\.py",
+                      DOCKERFILE.read_text(), re.DOTALL) is not None,
+            "the gate is deleted in the same RUN that runs it, so it is not in the image",
+        )
+
+    # MOSHTARAK_WIFI_STATE must stay on the mapped /config path: that is what
+    # puts history.db inside Home Assistant's own backups.
+    check(
+        "MOSHTARAK_WIFI_STATE=/config/moshtarak-wifi" in DOCKERFILE.read_text(),
+        "state dir is on the mapped /config path, so history.db is backed up",
+    )
+
     print(f"\n{passed} passed, {len(failed)} failed")
     if failed:
         print("\nFAILED:")

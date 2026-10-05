@@ -1,6 +1,6 @@
 ---
 name: Moshtarak WiFi (TONLY / LG-U+ MTTL-W01)
-version: "1.0.0"
+version: "1.0.1"
 slug: moshtarak_wifi
 description: >-
   Controls TONLY / LG-U+ MTTL-W01 four-socket Wi-Fi power strips over the

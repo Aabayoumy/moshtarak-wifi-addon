@@ -14,3 +14,30 @@
   so an install with no hardware yet cannot restart-loop.
 - `provision.py` is shipped in `tools/` rather than in the image: it needs a
   machine that can join the strip's own setup Wi-Fi.
+## 1.0.1
+
+Fixes found by actually installing the app rather than reading the Dockerfile.
+
+- **The image could not build.** The build-time smoke test used a multi-line
+  `python3 -c "..."` inside a `RUN`. Docker continues a line only on an
+  explicit backslash, so the second physical line was parsed as an instruction
+  and the build failed with `dockerfile parse error ... unknown instruction:
+  import`. Both checks are now single physical lines, and
+  `tests/test_addon_contract.py` now rejects a Dockerfile whose logical lines
+  do not each begin with a real instruction.
+
+- **The app could not start.** `USER moshtarak` was set in the Dockerfile.
+  s6-overlay v3 needs to begin as root so it can set up supervision and drop
+  privileges itself; with `USER` set the app died on every start with
+  `s6-overlay-suexec: fatal: can only run as pid 1`. There was a second reason
+  it could not have worked: `MOSHTARAK_WIFI_STATE` is `/config/moshtarak-wifi`,
+  and `/config` is a root-owned bind mount supplied by the Supervisor at run
+  time, so an unprivileged process could not create it. The app now runs as
+  root, as most Home Assistant apps do, and the Dockerfile records why.
+
+- **Replaced the weak build checks with a real one.** The old checks confirmed a
+  user existed and could bind a socket; both were true of an image that still
+  could not start. `moshtarak_wifi/build_verify.py` now launches the controller
+  inside the build and requires a 200 from `/api/health`, checks that the mode
+  reached it from the environment, and fails the build if the measured
+  socket→channel order is not `[2, 3, 4, 1]`.

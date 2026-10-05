@@ -15,18 +15,6 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     MOSHTARAK_WIFI_STATE=/config/moshtarak-wifi
 
-# The controller needs no capabilities whatsoever, so it runs unprivileged.
-#
-# These are NOT `|| true`. An earlier version swallowed a failure here, and the
-# result was a layer that "built fine" but produced a container whose `USER
-# moshtarak` does not exist - so it failed to start, with the reason visible
-# nowhere except a Supervisor log line about an unknown user. A build that
-# cannot produce a runnable image should fail loudly HERE instead.
-RUN addgroup -g 1000 moshtarak \
- && adduser -u 1000 -D -G moshtarak -h /opt/moshtarak-wifi moshtarak \
- && mkdir -p /config/moshtarak-wifi \
- && chown -R moshtarak:moshtarak /opt/moshtarak-wifi /config
-
 COPY rootfs/ /opt/moshtarak-wifi/
 COPY run.sh /opt/moshtarak-wifi/run.sh
 
@@ -36,26 +24,36 @@ RUN python3 -m py_compile /opt/moshtarak-wifi/server.py /opt/moshtarak-wifi/adap
  && rm -rf /opt/moshtarak-wifi/__pycache__ \
  && chmod +x /opt/moshtarak-wifi/run.sh
 
-# Prove the built image can actually RUN the controller, before anyone installs
-# it. Three things are checked that a successful build on its own would not
-# catch:
+# Actually start the controller and ask it for /api/health, inside the image,
+# before anybody installs it. A successful build does not imply a startable app:
+# a base image is free to ship a trimmed Python, and a controller can start yet
+# fail to bind or serve.
 #
-#   1. the unprivileged user really exists, so `USER moshtarak` below resolves;
-#   2. every stdlib module the controller imports is present in this base image
-#      (a base image is free to ship a trimmed Python);
-#   3. the controller's HTTP server can actually bind a socket as this user, so
-#      a missing capability shows up here rather than as a restart loop.
+# build_verify.py is copied to /tmp and deleted in the same RUN, so it is not
+# part of the running image (the COPY layer that briefly held it remains in the
+# layer history, ~4kB, which is the price of a readable check).
+COPY build_verify.py /tmp/build_verify.py
+RUN python3 /tmp/build_verify.py && rm -f /tmp/build_verify.py
+
+# NOTE: no `USER` instruction, deliberately. An earlier version created an
+# unprivileged `moshtarak` user and set USER to it, and the app still would not
+# start - for two independent reasons:
 #
-# Each check is one physical line on purpose. Docker continues a RUN only on an
-# explicit backslash, so a multi-line `python3 -c "..."` does not parse: the
-# second line is read as a fresh instruction and the build dies with
-# "dockerfile parse error ... unknown instruction: import". That is not
-# hypothetical - it is what an earlier version of this file did, and it was
-# only caught because the image was actually built rather than eyeballed.
-RUN su moshtarak -c 'python3 -c "import json, os, re, socket, socketserver, sqlite3, sys, threading, time; from http.server import ThreadingHTTPServer; print(\"stdlib ok\")"' \
- && su moshtarak -c 'python3 -c "import socket; s = socket.socket(); s.bind((\"127.0.0.1\", 0)); print(\"can bind:\", s.getsockname()[1]); s.close()"'
+#   1. s6-overlay v3 (what the Home Assistant base images use) requires the
+#      container to begin as root so it can set up supervision and then drop
+#      privileges itself. With USER set, the app died instantly with
+#      "s6-overlay-suexec: fatal: can only run as pid 1".
+#   2. MOSHTARAK_WIFI_STATE is /config/moshtarak-wifi, and /config is a bind
+#      mount of the shared, root-owned Home Assistant configuration directory
+#      supplied by the Supervisor at run time. An unprivileged process cannot
+#      create that directory, so the controller would have failed on its state
+#      database. Keeping history there is deliberate: it is what puts
+#      history.db inside Home Assistant's own backups.
+#
+# So the app runs as root, as most Home Assistant apps do. The controller needs
+# no capabilities, listens only on the published callback port and an
+# unpublished internal port, and executes no user-supplied code.
 
 WORKDIR /opt/moshtarak-wifi
-USER moshtarak
 
 CMD [ "/opt/moshtarak-wifi/run.sh" ]
