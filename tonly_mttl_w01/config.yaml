@@ -1,11 +1,11 @@
 ---
-name: Moshtarak WiFi (TONLY / LG-U+ MTTL-W01)
-version: "1.0.2"
-slug: moshtarak_wifi
+name: TONLY MTTL-W01 WiFi
+version: "1.0.3"
+slug: tonly_mttl_w01
 description: >-
   Controls TONLY / LG-U+ MTTL-W01 four-socket Wi-Fi power strips over the
   strip's undocumented callback protocol.
-url: https://github.com/Aabayoumy/moshtarak-wifi-addon
+url: https://github.com/Aabayoumy/tonly-mttl-w01-addon
 arch:
   - amd64
   - aarch64
@@ -55,7 +55,12 @@ watchdog: http://[HOST]:8099/api/health
 panel_icon: mdi:power-socket-us
 options:
   mode: auto
-  poll: 5
+  # Seconds between state reads. This is the freshness window of the state
+  # cache. Deliberately short: after a switch command the controller
+  # force-reads before the strip's echo lands, so the cache can briefly hold
+  # the previous state; a 2s window means HA sees the true echo on the very
+  # next read instead of up to 10s later.
+  poll: 2
   protect: ""
   protect_by_device: ""
   history_interval: 20

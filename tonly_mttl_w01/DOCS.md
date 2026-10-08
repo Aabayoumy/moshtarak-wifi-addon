@@ -1,4 +1,4 @@
-# Moshtarak WiFi — app configuration
+# MTTL-W01 WiFi — app configuration
 
 Full option reference. For protocol background and honest limits, read the
 [repository README](../README.md).
@@ -60,16 +60,16 @@ per boot, e.g. `protection: 2CFDB3355BA3 locks socket [2]`. If you instead see
 ### `history_interval` / `history_keep_h`
 
 Sampling interval in seconds (default `20`) and retention in hours (default
-`48`). Stored in `history.db` under `/config/moshtarak-wifi/`, which is mapped so
+`48`). Stored in `history.db` under `/config/tonly-mttl-w01/`, which is mapped so
 it is included in Supervisor backups.
 
 ## State files
 
 | Path | Contents |
 |---|---|
-| `/config/moshtarak-wifi/config.json` | Runtime settings last saved through the API. **Beats the environment** — that is what the app last set. |
-| `/config/moshtarak-wifi/timers.json` | Timers. They run here, not in a phone app, so they fire when the phone is away. |
-| `/config/moshtarak-wifi/history.db` | SQLite history. |
+| `/config/tonly-mttl-w01/config.json` | Runtime settings last saved through the API. **Beats the environment** — that is what the app last set. |
+| `/config/tonly-mttl-w01/timers.json` | Timers. They run here, not in a phone app, so they fire when the phone is away. |
+| `/config/tonly-mttl-w01/history.db` | SQLite history. |
 
 ## Networks
 
@@ -81,8 +81,8 @@ it is included in Supervisor backups.
 ## Checking it is alive
 
 ```sh
-ha apps info moshtarak_wifi      # state, ports, options
-ha apps logs moshtarak_wifi      # boot lines, protection, requests
+ha apps info tonly_mttl_w01      # state, ports, options
+ha apps logs tonly_mttl_w01      # boot lines, protection, requests
 ```
 
 From inside the add-on, `curl -s http://localhost:8099/api/health`. It answers

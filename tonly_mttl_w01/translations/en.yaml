@@ -1,6 +1,6 @@
 configuration:
-  moshtarak_wifi:
-    name: Moshtarak WiFi
+  tonly_mttl_w01:
+    name: TONLY MTTL-W01 WiFi
     options:
       mode: auto
       poll: 5

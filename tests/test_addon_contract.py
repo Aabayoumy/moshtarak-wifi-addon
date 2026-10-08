@@ -39,7 +39,7 @@ except ImportError:
     print("PyYAML required: pip install pyyaml")
     raise SystemExit(2)
 
-ADDON = Path(__file__).resolve().parent.parent / "moshtarak_wifi"
+ADDON = Path(__file__).resolve().parent.parent / "tonly_mttl_w01"
 CONFIG_YAML = ADDON / "config.yaml"
 RUN_SH = ADDON / "run.sh"
 DOCKERFILE = ADDON / "Dockerfile"
@@ -261,7 +261,7 @@ def main() -> int:
         "no `image:` key (it would make install try to pull a nonexistent image)",
     )
     check(
-        cfg.get("slug") == "moshtarak_wifi",
+        cfg.get("slug") == "tonly_mttl_w01",
         "slug matches the directory name",
         f"slug={cfg.get('slug')!r}",
     )

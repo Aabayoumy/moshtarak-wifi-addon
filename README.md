@@ -1,4 +1,4 @@
-# Moshtarak WiFi — Home Assistant app (add-on)
+# MTTL-W01 WiFi — Home Assistant app (add-on)
 
 Controls a **TONLY / LG-U+ MTTL-W01** four-socket Wi-Fi power strip from Home
 Assistant.
@@ -10,19 +10,19 @@ listener.
 
 ## Contents
 
-- `moshtarak_wifi/` — the app. Pure-standard-library Python, no pip install.
+- `tonly_mttl_w01/` — the app. Pure-standard-library Python, no pip install.
 - `tests/` — the controller's assertion suites (169 assertions). Not shipped in
   the image; run them from a checkout.
 - `tools/provision.py` — first-time strip provisioning. Deliberately **not** in
   the image: it must run on a machine joined to the strip's own setup Wi-Fi,
-  which a container has no radio for. See [Provisioning](moshtarak_wifi/PROVISIONING.md).
+  which a container has no radio for. See [Provisioning](tonly_mttl_w01/PROVISIONING.md).
 
 ## Install
 
 1. **Settings → Apps → ⋮ (top right) → Repositories**
-2. Add `https://github.com/Aabayoumy/moshtarak-wifi-addon`
-3. **Settings → Apps → Install app → Moshtarak WiFi**, then Start
-4. Then install the **`moshtarak_wifi`** integration from HACS. The add-on is
+2. Add `https://github.com/Aabayoumy/tonly-mttl-w01-addon`
+3. **Settings → Apps → Install app → MTTL-W01 WiFi**, then Start
+4. Then install the **`tonly_mttl_w01`** integration from HACS. The add-on is
    the controller; the integration is what creates the entities in Home
    Assistant. Neither works alone.
 

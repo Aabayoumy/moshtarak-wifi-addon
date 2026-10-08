@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""End-to-end test of the extended Moshtarak-Wifi controller.
+"""End-to-end test of the extended MTTL-W01 controller.
 
 Runs the real server.py in simulator mode against a scratch state directory, so
 nothing here can touch the real strip or the real server socket. Checks the

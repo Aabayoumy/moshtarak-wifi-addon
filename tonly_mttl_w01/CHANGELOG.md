@@ -1,9 +1,22 @@
 # Changelog
 
+## 1.0.3
+
+- **Renamed**: the app is now `tonly_mttl_w01` (TNLY MTTL-W01 WiFi). The old
+  `moshtarak_wifi` name and repository are gone. The controller itself remains
+  Karim Elrashedy's unmodified code, and the vendored `MOSHTARAK_WIFI_*`
+  environment names it reads are unchanged.
+- **Switch state now echoes in ~2s instead of ~10s.** The controller force-reads
+  state immediately after a switch command, before the strip's echo lands, and
+  serves that stale reading from a `poll`-second cache. The default `poll` is
+  now 2s (was 5s), and the Home Assistant integration re-reads once ~2.5s after
+  a command, so the UI reflects the strip's own answer a couple of seconds
+  after a tap instead of on a later poll cycle.
+
 ## 1.0.0
 
 - Initial release.
-- Packages Karim Elrashedy's Moshtarak-Wifi controller, **unmodified**, as a Home
+- Packages Karim Elrashedy's MTTL-W01 WiFi controller, **unmodified**, as a Home
   Assistant app. No protocol logic was changed.
 - Options map onto the controller's existing environment variables: `mode`,
   `poll`, `protect`, `protect_by_device`, `history_interval`, `history_keep_h`.
@@ -37,7 +50,7 @@ Fixes found by actually installing the app rather than reading the Dockerfile.
 
 - **Replaced the weak build checks with a real one.** The old checks confirmed a
   user existed and could bind a socket; both were true of an image that still
-  could not start. `moshtarak_wifi/build_verify.py` now launches the controller
+  could not start. `tonly_mttl_w01/build_verify.py` now launches the controller
   inside the build and requires a 200 from `/api/health`, checks that the mode
   reached it from the environment, and fails the build if the measured
   socket→channel order is not `[2, 3, 4, 1]`.

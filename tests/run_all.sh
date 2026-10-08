@@ -6,7 +6,7 @@
 # files sit in the same folder. That is how they were written, against a flat
 # directory on Karim's box.
 #
-# Splitting them here - runtime in moshtarak_wifi/rootfs/, tests in tests/ - is
+# Splitting them here - runtime in tonly_mttl_w01/rootfs/, tests in tests/ - is
 # deliberate: the add-on payload must not carry test code into the image. So this
 # script assembles a scratch directory, runs everything there, and cleans up.
 #
@@ -26,9 +26,9 @@ set -eu
 
 TESTS_DIR=$(cd "$(dirname "$0")" && pwd)
 ADDON_DIR=$(dirname "$TESTS_DIR")
-RUNTIME_DIR="$ADDON_DIR/moshtarak_wifi/rootfs"
+RUNTIME_DIR="$ADDON_DIR/tonly_mttl_w01/rootfs"
 
-WORK=$(mktemp -d "${TMPDIR:-/tmp}/moshtarak-tests.XXXXXX")
+WORK=$(mktemp -d "${TMPDIR:-/tmp}/tonly-mttl-tests.XXXXXX")
 OUTDIR="$WORK/.out"
 mkdir -p "$OUTDIR"
 trap 'rm -rf "$WORK"' EXIT INT TERM

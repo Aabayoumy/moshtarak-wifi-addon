@@ -2,7 +2,7 @@
 
 ## The controller is someone else's work
 
-`moshtarak_wifi/rootfs/server.py` and `moshtarak_wifi/rootfs/adapters.py` are
+`tonly_mttl_w01/rootfs/server.py` and `tonly_mttl_w01/rootfs/adapters.py` are
 **Karim Elrashedy's** work on the Moshtarak-Wifi project, provided to this
 repository to package as a Home Assistant app. They are used here **unmodified**
 — the add-on adds a wrapper, an options mapping and a container, nothing to the
