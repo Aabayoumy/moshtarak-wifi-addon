@@ -13,7 +13,7 @@ start". Two real failures got past that gap:
 Neither is visible from `docker build` succeeding. Both are visible from this.
 
 The port and the state directory are deliberately build-local: the real
-MOSHTARAK_WIFI_STATE is /config/tonly-mttl-w01, which does not exist yet at
+MOSHTARAK_WIFI_STATE is /config/moshtarak-wifi, which does not exist yet at
 build time because /config is a bind mount supplied by the Supervisor when the
 app runs. Getting that wrong is why the build uses a throwaway directory.
 
@@ -45,7 +45,7 @@ REQUIRED = (
     "threading", "time",
 )
 
-RUNTIME_DIR = os.environ.get("MOSHTARAK_RUNTIME_DIR", "/opt/tonly-mttl-w01")
+RUNTIME_DIR = os.environ.get("MOSHTARAK_RUNTIME_DIR", "/opt/moshtarak-wifi")
 TEST_PORT = int(os.environ.get("MOSHTARAK_GATE_PORT", "8479"))
 
 

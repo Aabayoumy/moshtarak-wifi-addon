@@ -365,6 +365,26 @@ def main() -> int:
                       DOCKERFILE.read_text(), re.DOTALL) is not None,
             "the gate is deleted in the same RUN that runs it, so it is not in the image",
         )
+        # The gate's default runtime dir must be the Dockerfile's own COPY
+        # target. This is a coupled pair: the gate proves server.py exists at
+        # the same path the image will run it from. One of the two broke and
+        # the image failed to build even though every other check passed, so
+        # the contract test now ties them together.
+        dockerfile_copy_targets = re.findall(
+            r"^COPY\s+(\S+)\s+(\S+)\s*$", DOCKERFILE.read_text(), re.MULTILINE
+        )
+        copied_paths = set()
+        for _src, _dst in dockerfile_copy_targets:
+            if _dst.startswith("/opt/"):
+                copied_paths.add(_dst.rstrip("/"))
+        runtime_def = re.search(
+            r'RUNTIME_DIR\s*=\s*os\.environ\.get\(\s*"MOSHTARAK_RUNTIME_DIR"\s*,\s*"([^"]+)"\s*\)',
+            gate.read_text(),
+        )
+        check(
+            runtime_def is not None and runtime_def.group(1) in copied_paths,
+            "build_verify's default RUNTIME_DIR is one of the Dockerfile's /opt COPY targets",
+        )
 
     # MOSHTARAK_WIFI_STATE must stay on the mapped /config path: that is what
     # puts history.db inside Home Assistant's own backups.
