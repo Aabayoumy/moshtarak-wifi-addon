@@ -283,16 +283,22 @@ class MacWifi(WifiBackend):
         return None
 
     def connect(self, ssid, password=None):
-        svc, dev = self._port()
+        _svc, dev = self._port()
         # A powered-off radio fails the join with "not a Wi-Fi interface",
         # which reads like a wrong name. Power on first; harmless if already on.
         _run(("networksetup", "-setairportpower", dev, "on"), timeout=15)
-        argv = ["networksetup", "-setairportnetwork", svc, ssid]
+        # NOTE: despite the man page saying "service", current macOS wants the
+        # DEVICE here (en0). With the service name it always answers "Wi-Fi is
+        # not a Wi-Fi interface" - verified 2026-10-09 on macOS 27.
+        argv = ["networksetup", "-setairportnetwork", dev, ssid]
         if password:
             argv.append(password)
         proc = _run(argv, timeout=30)
-        if proc.returncode != 0:
-            err = (proc.stderr or proc.stdout).strip()
+        out = ((proc.stdout or "") + "\n" + (proc.stderr or "")).strip()
+        # networksetup can exit 0 while printing failure ("Could not find
+        # network ..."), so judge by the text, not just the return code.
+        if proc.returncode != 0 or "could not" in out.lower() or "** error" in out:
+            err = out
             if "not associated" in err or "could not" in err.lower():
                 hint = (" (tip: macOS may ask for an admin password to change "
                         "Wi-Fi; re-run with sudo)")
