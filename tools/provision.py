@@ -639,10 +639,21 @@ def pick_setup_ap(backend, explicit):
                 return found[int(choice) - 1]
     print("  no setup AP found. The strip broadcasts TONLY_TAP_xxxx while it "
           "blinks in pairing mode; phones hide it unless Location is on.")
-    name = input("  setup AP name (or empty to quit)? ").strip()
-    if not name:
-        sys.exit("aborted: no setup AP selected")
-    return name
+    while True:
+        name = input("  setup AP name (or empty to quit)? ").strip()
+        if not name:
+            sys.exit("aborted: no setup AP selected")
+        if name.upper().startswith("LGU_"):
+            # The single most common typo on this prompt: the PASSPHRASE goes
+            # in the Wi-Fi password field later - here we need the NETWORK name
+            # (TONLY_TAP_xxxx). Catch it instead of joining garbage.
+            print("  that is the passphrase, not the network name: the setup AP "
+                  "is called TONLY_TAP_xxxx (see the strip's label). Try again.")
+            continue
+        if not strip_is_setup_ap(name):
+            print("  WARNING: %r does not look like a strip setup AP "
+                  "(expected TONLY_TAP_xxxx); trying it anyway." % name)
+        return name
 
 
 def main():
