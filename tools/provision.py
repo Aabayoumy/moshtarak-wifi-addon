@@ -299,6 +299,13 @@ class MacWifi(WifiBackend):
         # network ..."), so judge by the text, not just the return code.
         if proc.returncode != 0 or "could not" in out.lower() or "** error" in out:
             err = out
+            if "could not find network" in err.lower():
+                raise WifiError("the Mac's Wi-Fi cannot see %r right now: "
+                                "the strip is not in pairing mode, is out of range, "
+                                "or is already provisioned (provisioned strips stop "
+                                "broadcasting). Hold this machine within a few meters, "
+                                "confirm the slow blink, and check the Wi-Fi menu "
+                                "shows the name before retrying." % ssid)
             if "not associated" in err or "could not" in err.lower():
                 hint = (" (tip: macOS may ask for an admin password to change "
                         "Wi-Fi; re-run with sudo)")
