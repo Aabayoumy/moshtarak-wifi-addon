@@ -511,6 +511,32 @@ def default_gateway():
     return None
 
 
+def arp_mac(ip):
+    """MAC of a neighbour IP via the ARP table, or None. Best effort, never fatal.
+
+    Called while joined to the strip's setup AP, the gateway IS the strip, so
+    this reports the strip's own setup-interface MAC - the one identity you can
+    read before the strip owns a DHCP address. Compare it with the label.
+    """
+    import re as _re
+    if sys.platform in ("win32", "cygwin"):
+        argv = ("arp", "-a", ip)
+    else:
+        argv = ("arp", "-n", ip)
+    try:
+        out = subprocess.run(argv, capture_output=True, text=True,
+                             timeout=10).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    m = _re.search(r"([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})", out)
+    if m:
+        return m.group(1).lower()
+    m = _re.search(r"([0-9a-fA-F]{2}(?:-[0-9a-fA-F]{2}){5})", out)
+    if m:
+        return m.group(1).lower().replace("-", ":")
+    return None
+
+
 def guess_controller_ip():
     """Best-effort default for the controller prompt: homeassistant.local.
 
@@ -606,9 +632,14 @@ def verify_at_controller(controller):
               % controller)
         return
     devs = body.get("devices") or []
-    print("  controller at %s lists %d device(s): %s"
-          % (controller, len(devs),
-             ", ".join(str(d.get("devid")) for d in devs) or "none yet"))
+    print("  controller at %s lists %d device(s):" % (controller, len(devs)))
+    for d in devs:
+        print("    devid=%s connected=%s lan_ip=%s" %
+              (d.get("devid"), d.get("connected"),
+               (d.get("remote") or "-").split(":")[0]))
+    if not devs:
+        print("    none yet - give the strip another minute, then re-check from "
+              "the HA host.")
 
 
 # ------------------------------------------------------------------ main flow
@@ -764,6 +795,11 @@ def main():
     if not gw:
         sys.exit("error: cannot detect the setup AP gateway; pass --gateway "
                  "(usually the AP's own address)")
+    mac = arp_mac(gw)
+    if mac:
+        print("strip MAC (setup) : %s   (compare with the label on the unit)" % mac)
+    else:
+        print("strip MAC (setup) : unknown (ARP lookup failed; harmless)")
 
     provision_over_socket(gw, controller, ssid, password, reboot=a.reboot)
 
