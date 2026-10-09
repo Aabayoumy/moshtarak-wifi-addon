@@ -519,15 +519,30 @@ def arp_mac(ip):
     read before the strip owns a DHCP address. Compare it with the label.
     """
     import re as _re
-    if sys.platform in ("win32", "cygwin"):
-        argv = ("arp", "-a", ip)
-    else:
-        argv = ("arp", "-n", ip)
-    try:
-        out = subprocess.run(argv, capture_output=True, text=True,
-                             timeout=10).stdout
-    except (OSError, subprocess.SubprocessError):
-        return None
+    def _arp():
+        if sys.platform in ("win32", "cygwin"):
+            argv = ("arp", "-a", ip)
+        else:
+            argv = ("arp", "-n", ip)
+        try:
+            return subprocess.run(argv, capture_output=True, text=True,
+                                  timeout=10).stdout
+        except (OSError, subprocess.SubprocessError):
+            return ""
+    out = _arp()
+    if "no entry" in out.lower() or not out.strip():
+        # No traffic yet means no ARP entry. One ping is enough to resolve it;
+        # the lookup below runs before the first TCP to the strip.
+        try:
+            if sys.platform in ("win32", "cygwin"):
+                subprocess.run(("ping", "-n", "1", "-w", "1000", ip),
+                               capture_output=True, timeout=10)
+            else:
+                subprocess.run(("ping", "-c", "1", "-t", "1", ip),
+                               capture_output=True, timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            pass
+        out = _arp()
     m = _re.search(r"([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})", out)
     if m:
         return m.group(1).lower()
