@@ -2,10 +2,11 @@
 
 ## 1.0.3
 
-- **Renamed**: the app is now `tonly_mttl_w01` (TNLY MTTL-W01 WiFi). The old
-  `moshtarak_wifi` name and repository are gone. The controller itself remains
-  Karim Elrashedy's unmodified code, and the vendored `MOSHTARAK_WIFI_*`
-  environment names it reads are unchanged.
+- **Renamed**: the app is now `tonly_mttl_w01` (TONLY MTTL-W01 WiFi). The old
+  `moshtarak-wifi` name and repository are gone. The controller itself remains
+  Karim Elrashedy's unmodified code; the vendored `MOSHTARAK_WIFI_*`
+  environment names were renamed to `TONLY_MTTL_W01_*` (breaking: reconfigure
+  or rely on the one-shot `/config` migration in run.sh).
 - **Switch state now echoes in ~2s instead of ~10s.** The controller force-reads
   state immediately after a switch command, before the strip's echo lands, and
   serves that stale reading from a `poll`-second cache. The default `poll` is
@@ -39,11 +40,11 @@ Fixes found by actually installing the app rather than reading the Dockerfile.
   `tests/test_addon_contract.py` now rejects a Dockerfile whose logical lines
   do not each begin with a real instruction.
 
-- **The app could not start.** `USER moshtarak` was set in the Dockerfile.
+- **The app could not start.** `USER tonly` was set in the Dockerfile.
   s6-overlay v3 needs to begin as root so it can set up supervision and drop
   privileges itself; with `USER` set the app died on every start with
   `s6-overlay-suexec: fatal: can only run as pid 1`. There was a second reason
-  it could not have worked: `MOSHTARAK_WIFI_STATE` is `/config/moshtarak-wifi`,
+  it could not have worked: `TONLY_MTTL_W01_STATE` is `/config/tonly-mttl-w01`,
   and `/config` is a root-owned bind mount supplied by the Supervisor at run
   time, so an unprivileged process could not create it. The app now runs as
   root, as most Home Assistant apps do, and the Dockerfile records why.
@@ -52,8 +53,8 @@ Fixes found by actually installing the app rather than reading the Dockerfile.
   user existed and could bind a socket; both were true of an image that still
   could not start. `tonly_mttl_w01/build_verify.py` now launches the controller
   inside the build and requires a 200 from `/api/health`, checks that the mode
-  reached it from the environment, and fails the build if the measured
-  socket→channel order is not `[2, 3, 4, 1]`.
+  reached it from the environment, and fails the build if the commissioned
+  socket→channel order is not `[1, 2, 3, 4]` (identity, blink-verified 2026-10-09).
 
 ## 1.0.2
 

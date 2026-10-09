@@ -75,14 +75,14 @@ def wait_for(fn, seconds=25):
 
 env = dict(os.environ)
 env.update({
-    "MOSHTARAK_WIFI_MODE": "mttl",            # hardware only: no simulator here,
-    "MOSHTARAK_WIFI_LISTEN": str(API_PORT),   # so nothing can be faked
-    "MOSHTARAK_WIFI_BIND": "127.0.0.1",
-    "MOSHTARAK_WIFI_DEVICE_PORT": str(DEVICE_PORT),
-    "MOSHTARAK_WIFI_STATE": STATE,
-    "MOSHTARAK_WIFI_PROTECT": "3",            # firmware ch3 = physical socket 2
-    "MOSHTARAK_WIFI_POLL": "0",
-    "MOSHTARAK_WIFI_HISTORY_INTERVAL": "3",
+    "TONLY_MTTL_W01_MODE": "mttl",            # hardware only: no simulator here,
+    "TONLY_MTTL_W01_LISTEN": str(API_PORT),   # so nothing can be faked
+    "TONLY_MTTL_W01_BIND": "127.0.0.1",
+    "TONLY_MTTL_W01_DEVICE_PORT": str(DEVICE_PORT),
+    "TONLY_MTTL_W01_STATE": STATE,
+    "TONLY_MTTL_W01_PROTECT": "2",            # firmware ch2 = physical socket 2 (server)
+    "TONLY_MTTL_W01_POLL": "0",
+    "TONLY_MTTL_W01_HISTORY_INTERVAL": "3",
 })
 
 server = subprocess.Popen([sys.executable, os.path.join(HERE, "server.py")],
@@ -115,10 +115,10 @@ try:
     # Every strip has its own distinct power and temperature, and the raw values
     # line up with the relays that are actually closed, so a mixed-up read is
     # impossible to mistake for a correct one.
-    #  A: pattern 1010 -> ch1, ch3 on  -> sockets (ch2,ch3,ch4,ch1) off,on,off,on
-    #     power 1111,2222,3333,4444 -> sockets 0, 3333, 0, 1111
+    #  A: pattern 1010 -> ch1, ch3 on  -> sockets on,off,on,off (identity)
+    #     power 1111,2222,3333,4444 -> sockets 1111, 0, 3333, 0
     #  B: pattern 1111 -> all on       -> sockets on,on,on,on
-    #     power 9999,8888,7777,6666 -> sockets 8888, 7777, 6666, 9999
+    #     power 9999,8888,7777,6666 -> sockets 9999, 8888, 7777, 6666
     kids.append(start_strip(STRIP_A, "1010", "1111,2222,3333,4444", 21))
     # Start B only once A is registered. Launching both at once is a race over
     # who says hello first, and "which strip is the default" is exactly what this
@@ -150,26 +150,26 @@ try:
     # plugging in a second strip cannot quietly take over Home Assistant.
     check("state names the strip it answered for", st["device"], STRIP_A)
     check("and that is the first strip to connect",
-          [s["power_raw"] for s in st["switches"]], [0, 3333, 0, 1111])
+          [s["power_raw"] for s in st["switches"]], [1111, 0, 3333, 0])
 
     print("\n2. each strip's own state, not a mixture")
     _, a = call("/api/state?device=%s" % STRIP_A, expect=200)
     check("strip A relays, in physical socket order",
-          [s["on"] for s in a["switches"]], [False, True, False, True])
+          [s["on"] for s in a["switches"]], [True, False, True, False])
     check("strip A power readings are its own",
-          [s["power_raw"] for s in a["switches"]], [0, 3333, 0, 1111])
+          [s["power_raw"] for s in a["switches"]], [1111, 0, 3333, 0])
     check("strip A temperature is its own",
           [s["temp_c"] for s in a["switches"]], [21, 21, 21, 21])
     _, b = call("/api/state?device=%s" % STRIP_B, expect=200)
     check("strip B relays, in physical socket order",
           [s["on"] for s in b["switches"]], [True, True, True, True])
     check("strip B power readings are its own",
-          [s["power_raw"] for s in b["switches"]], [8888, 7777, 6666, 9999])
+          [s["power_raw"] for s in b["switches"]], [9999, 8888, 7777, 6666])
     check("strip B temperature is its own",
           [s["temp_c"] for s in b["switches"]], [33, 33, 33, 33])
 
     print("\n3. a command reaches only the strip it was aimed at")
-    # Physical socket 4 is firmware channel 1: on on strip A, on on strip B.
+    # Physical socket 4 is firmware channel 4: on on strip A, on on strip B.
     code, _ = call("/api/switch/socket/4?device=%s" % STRIP_A, {"on": False}, expect=200)
     check("addressed command accepted", code, 200)
     time.sleep(1.5)
@@ -179,10 +179,10 @@ try:
     check("strip A socket 4 no longer draws", a["switches"][3]["power_raw"], 0)
     check("strip B socket 4 is untouched", b["switches"][3]["on"], True)
     check("strip B still reads its own power",
-          b["switches"][3]["power_raw"], 9999)
+          b["switches"][3]["power_raw"], 6666)
 
     print("\n4. protection still applies with two strips up")
-    # Physical socket 2 = firmware channel 3, on on strip A, protected.
+    # Physical socket 2 = firmware channel 2, on on strip A, protected.
     code, body = call("/api/switch/socket/2?device=%s" % STRIP_A, {"on": False})
     check("protected socket refuses OFF", code, 409)
     check_true("and says why", "protected" in body.get("error", ""), body.get("error"))
@@ -207,15 +207,15 @@ try:
     check("state falls back to the one that is up", st["device"], STRIP_B)
     check("no longer ambiguous", st["ambiguous"], False)
     check("and it is B's data, not A's",
-          [s["power_raw"] for s in st["switches"]], [8888, 7777, 6666, 9999])
+          [s["power_raw"] for s in st["switches"]], [9999, 8888, 7777, 6666])
 
     print("\n6. per-strip protection, with both strips connected")
     # The legacy global list protected socket 2 on BOTH strips. That is wrong:
     # strip A holds the server, strip B is an empty spare.
     server.terminate()
     server.wait(timeout=10)
-    env["MOSHTARAK_WIFI_PROTECT"] = ""
-    env["MOSHTARAK_WIFI_PROTECT_BY_DEVICE"] = "%s=3" % STRIP_A
+    env["TONLY_MTTL_W01_PROTECT"] = ""
+    env["TONLY_MTTL_W01_PROTECT_BY_DEVICE"] = "%s=2" % STRIP_A
     server = subprocess.Popen(
         [sys.executable, os.path.join(HERE, "server.py")],
         env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -229,6 +229,11 @@ try:
     # about two strips coexisting, not about one.
     kids.append(start_strip(STRIP_A, "1010", "1111,2222,3333,4444", 21))
     wait_for(lambda: call("/api/devices")[1].get("connected") == 2)
+    # Restarted strip reports pattern 1010: server socket 2 starts OFF under
+    # identity order. Protection refuses OFF but allows ON, so switch it on
+    # explicitly (the pre-restart strip had it on).
+    call("/api/switch/socket/2?device=%s" % STRIP_A, {"on": True})
+    wait_for(lambda: (call("/api/state?device=%s" % STRIP_A)[1].get("switches") or [{}]*2)[1].get("on") is True)
     check("both strips connected again",
           sorted(d["devid"] for d in call("/api/devices")[1]["devices"]
                  if d["connected"]), sorted([STRIP_A, STRIP_B]))
@@ -244,7 +249,7 @@ try:
     check("server socket 2 still protected on strip A",
           a["switches"][1]["protected"], True)
     check("and strip A's protection is reported per strip",
-          sorted(a["protection"]["channels"]), [3])
+          sorted(a["protection"]["channels"]), [2])
 
     # Strip B is the spare and is deliberately NOT protected. This is the
     # behaviour the old global list could not express.
@@ -258,7 +263,7 @@ try:
           False)
     check("spare's protection list is empty", b["protection"]["channels"], [])
     check("the whole map is visible for review",
-          a["protection_by_device"], {STRIP_A: [3]})
+          a["protection_by_device"], {STRIP_A: [2]})
 
     # The strip list has to carry each strip's own locks, in the numbers a person
     # can match to the socket in front of them. A picker that has to ask a second
@@ -268,13 +273,16 @@ try:
     by = {d["devid"]: d for d in dv["devices"]}
     check("the strip list shows the server strip's lock as a SOCKET number",
           by[STRIP_A].get("protected_sockets"), [2])
-    check("and never as a firmware channel",
-          by[STRIP_A].get("protected_sockets") != by[STRIP_A].get("protected_channels"),
+    # Identity order (blink-verified): socket numbers equal channel numbers, so
+    # the old rotated-model check (sockets != channels) no longer applies. Both
+    # views must agree on [2] here.
+    check("sockets and channels agree under identity order",
+          by[STRIP_A].get("protected_sockets") == by[STRIP_A].get("protected_channels") == [2],
           True)
     check("the spare strip is listed with no locks",
           by[STRIP_B].get("protected_sockets"), [])
     check("the map travels with the list too",
-          dv.get("protection_by_device"), {STRIP_A: [3]})
+          dv.get("protection_by_device"), {STRIP_A: [2]})
 
     # A strip that has gone away must still say what it locks, from the saved
     # config, rather than silently reporting nothing.

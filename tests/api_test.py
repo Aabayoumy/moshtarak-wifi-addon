@@ -58,18 +58,18 @@ def call(path, payload=None, expect=None):
 
 env = dict(os.environ)
 env.update({
-    "MOSHTARAK_WIFI_MODE": "sim",
-    "MOSHTARAK_WIFI_LISTEN": str(PORT),
-    "MOSHTARAK_WIFI_BIND": "127.0.0.1",
-    "MOSHTARAK_WIFI_STATE": STATE,
+    "TONLY_MTTL_W01_MODE": "sim",
+    "TONLY_MTTL_W01_LISTEN": str(PORT),
+    "TONLY_MTTL_W01_BIND": "127.0.0.1",
+    "TONLY_MTTL_W01_STATE": STATE,
     # The simulator keeps its own file; point it at the scratch dir too so the
     # test cannot touch a real sim-state.json on the machine running it.
-    "MOSHTARAK_WIFI_SIM_STATE": os.path.join(STATE, "sim-state.json"),
-    # Firmware channel 3 == physical socket 2 == Karim's server. Protect it the
-    # same way the live unit is protected.
-    "MOSHTARAK_WIFI_PROTECT": "3",
-    "MOSHTARAK_WIFI_POLL": "0",
-    "MOSHTARAK_WIFI_HISTORY_INTERVAL": "2",
+    "TONLY_MTTL_W01_SIM_STATE": os.path.join(STATE, "sim-state.json"),
+    # Firmware channel 2 == physical socket 2 == the server. Protect it the
+    # same way the live unit (D8AA59D270AA) is protected.
+    "TONLY_MTTL_W01_PROTECT": "2",
+    "TONLY_MTTL_W01_POLL": "0",
+    "TONLY_MTTL_W01_HISTORY_INTERVAL": "2",
 })
 proc = subprocess.Popen([sys.executable, os.path.join(HERE, "server.py")],
                         env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -88,10 +88,10 @@ try:
     _, st = call("/api/state", expect=200)
     check("state order is physical 1,2,3,4",
           [s["socket"] for s in st["switches"]], [1, 2, 3, 4])
-    check("socket 1 is firmware channel 2", st["switches"][0]["channel"], 2)
-    check("socket 2 is firmware channel 3", st["switches"][1]["channel"], 3)
-    check("socket 3 is firmware channel 4", st["switches"][2]["channel"], 4)
-    check("socket 4 is firmware channel 1", st["switches"][3]["channel"], 1)
+    check("socket 1 is firmware channel 1", st["switches"][0]["channel"], 1)
+    check("socket 2 is firmware channel 2", st["switches"][1]["channel"], 2)
+    check("socket 3 is firmware channel 3", st["switches"][2]["channel"], 3)
+    check("socket 4 is firmware channel 4", st["switches"][3]["channel"], 4)
     check("protected flag follows the socket, not the channel",
           [s["protected"] for s in st["switches"]], [False, True, False, False])
 
@@ -105,10 +105,10 @@ try:
     check("protected socket may still be switched ON", code, 200)
 
     print("\n3. legacy channel path still works (Home Assistant)")
-    code, b = call("/api/switch/3", {"on": False})
-    check("channel 3 OFF refused for HA too", code, 409)
-    code, _ = call("/api/switches", {"1": True, "3": False}, expect=200)
-    _, b = call("/api/switches", {"1": True, "3": False}, expect=200)
+    code, b = call("/api/switch/2", {"on": False})
+    check("channel 2 OFF refused for HA too", code, 409)
+    code, _ = call("/api/switches", {"1": True, "2": False}, expect=200)
+    _, b = call("/api/switches", {"1": True, "2": False}, expect=200)
     refused = [r for r in b["results"] if not r.get("ok")]
     check_true("bulk refuses the protected channel", refused, refused)
     check_true("bulk still handles the others",
@@ -126,14 +126,14 @@ try:
     _, st = call("/api/state", expect=200)
     check("order change is applied",
           [s["channel"] for s in st["switches"]], [4, 3, 2, 1])
-    call("/api/config", {"order": [2, 3, 4, 1]}, expect=200)
+    call("/api/config", {"order": [1, 2, 3, 4]}, expect=200)
 
     print("\n5. timers")
     _, b = call("/api/timers", {"socket": 1, "at": "22:30", "on": True,
                                 "label": "Lamp evening"}, expect=200)
     check("timer added", len(b["timers"]), 1)
     tid = b["timers"][0]["id"]
-    check("timer resolves its firmware channel", b["timers"][0]["channel"], 2)
+    check("timer resolves its firmware channel", b["timers"][0]["channel"], 1)
     check("timer counts down", isinstance(b["timers"][0]["in_minutes"], int), True)
 
     code, _ = call("/api/timers", {"socket": 2, "at": "99:99", "on": True}, expect=400)

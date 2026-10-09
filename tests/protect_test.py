@@ -36,13 +36,13 @@ def load(env=None, state=None):
     for mod in ("server", "adapters"):
         sys.modules.pop(mod, None)
     base = {
-        "MOSHTARAK_WIFI_MODE": "sim",
-        "MOSHTARAK_WIFI_LISTEN": "18099",
-        "MOSHTARAK_WIFI_BIND": "127.0.0.1",
-        "MOSHTARAK_WIFI_STATE": state or tempfile.mkdtemp(),
-        "MOSHTARAK_WIFI_SIM_STATE": os.path.join(
+        "TONLY_MTTL_W01_MODE": "sim",
+        "TONLY_MTTL_W01_LISTEN": "18099",
+        "TONLY_MTTL_W01_BIND": "127.0.0.1",
+        "TONLY_MTTL_W01_STATE": state or tempfile.mkdtemp(),
+        "TONLY_MTTL_W01_SIM_STATE": os.path.join(
             state or tempfile.mkdtemp(), "sim.json"),
-        "MOSHTARAK_WIFI_POLL": "0",
+        "TONLY_MTTL_W01_POLL": "0",
     }
     base.update(env or {})
     old = dict(os.environ)
@@ -61,66 +61,66 @@ SPARE_B = "AABBCCDDEEFF"    # the empty spare
 
 
 # --------------------------------------------------------------- parsing
-print("\nparsing MOSHTARAK_WIFI_PROTECT_BY_DEVICE")
-s = load({"MOSHTARAK_WIFI_PROTECT_BY_DEVICE":
+print("\nparsing TONLY_MTTL_W01_PROTECT_BY_DEVICE")
+s = load({"TONLY_MTTL_W01_PROTECT_BY_DEVICE":
           "%s=3;%s=1,2" % (SERVER_A, SPARE_B)})
 ok(s.CONFIG["protect_by_device"] == {SERVER_A: [3], SPARE_B: [1, 2]},
    "parses two devices, one with two channels")
 ok(s.CONFIG["protect_by_device"][SERVER_A.upper()] == [3],
    "device id is normalised to upper case")
-ok(_try := load({"MOSHTARAK_WIFI_PROTECT_BY_DEVICE": "  "}).CONFIG[
+ok(_try := load({"TONLY_MTTL_W01_PROTECT_BY_DEVICE": "  "}).CONFIG[
     "protect_by_device"] == {}, "blank value yields an empty map")
-ok(load({"MOSHTARAK_WIFI_PROTECT_BY_DEVICE": "garbage"}).CONFIG[
+ok(load({"TONLY_MTTL_W01_PROTECT_BY_DEVICE": "garbage"}).CONFIG[
     "protect_by_device"] == {}, "unparseable value yields an empty map")
-ok(load({"MOSHTARAK_WIFI_PROTECT_BY_DEVICE": "%s=9" % SERVER_A}).CONFIG[
+ok(load({"TONLY_MTTL_W01_PROTECT_BY_DEVICE": "%s=9" % SERVER_A}).CONFIG[
     "protect_by_device"] == {},
    "channel 9 does not exist, so the whole entry is rejected")
-ok(load({"MOSHTARAK_WIFI_PROTECT_BY_DEVICE": "%s=3,4,x" % SPARE_B}).CONFIG[
+ok(load({"TONLY_MTTL_W01_PROTECT_BY_DEVICE": "%s=3,4,x" % SPARE_B}).CONFIG[
     "protect_by_device"] == {SPARE_B: [3, 4]},
    "a junk channel is dropped but the good ones survive")
 
 # ------------------------------------------------------------ the mapping
 print("\nthe measured socket/channel order still applies")
-s = load({"MOSHTARAK_WIFI_PROTECT_BY_DEVICE": "%s=3" % SERVER_A})
-ok(s.channel_to_socket(3) == 2,
-   "firmware channel 3 is physical socket 2 (the server)")
+s = load({"TONLY_MTTL_W01_PROTECT_BY_DEVICE": "%s=2" % SERVER_A})
+ok(s.channel_to_socket(2) == 2,
+   "firmware channel 2 is physical socket 2 (the server)")
 
 # -------------------------------------------------- per-strip behaviour
 print("\nprotection is per strip")
-s = load({"MOSHTARAK_WIFI_PROTECT_BY_DEVICE": "%s=3" % SERVER_A})
-ok(s.protected_channels_for(SERVER_A) == [3], "the server strip locks channel 3")
-ok(s.is_protected_channel(3, SERVER_A) is True,
+s = load({"TONLY_MTTL_W01_PROTECT_BY_DEVICE": "%s=2" % SERVER_A})
+ok(s.protected_channels_for(SERVER_A) == [2], "the server strip locks channel 2")
+ok(s.is_protected_channel(2, SERVER_A) is True,
    "socket 2 on the server strip is protected")
 ok(s.protected_channels_for(SPARE_B) == [],
    "the spare strip has no locks, which is what was asked for")
-ok(s.is_protected_channel(3, SPARE_B) is False,
+ok(s.is_protected_channel(2, SPARE_B) is False,
    "socket 2 on the SPARE is NOT protected - the whole point of the change")
 
 print("\nprotection tracks the strip you ask about")
-s = load({"MOSHTARAK_WIFI_PROTECT_BY_DEVICE":
-          "%s=3;%s=2" % (SERVER_A, SPARE_B)})
-ok(s.is_protected_channel(2, SPARE_B) is True and
-   s.is_protected_channel(3, SPARE_B) is False,
-   "the spare locks only its own channel 2")
-ok(s.is_protected_channel(3, SERVER_A) is True and
-   s.is_protected_channel(2, SERVER_A) is False,
+s = load({"TONLY_MTTL_W01_PROTECT_BY_DEVICE":
+          "%s=2;%s=1" % (SERVER_A, SPARE_B)})
+ok(s.is_protected_channel(1, SPARE_B) is True and
+   s.is_protected_channel(2, SPARE_B) is False,
+   "the spare locks only its own channel 1")
+ok(s.is_protected_channel(2, SERVER_A) is True and
+   s.is_protected_channel(1, SERVER_A) is False,
    "the two strips do not share each other's locks")
-ok(s.channel_to_socket(2) == 1,
-   "and channel 2 is physical socket 1 on this model")
+ok(s.channel_to_socket(1) == 1,
+   "and channel 1 is physical socket 1 on this model")
 
 # ------------------------------------------------------------ fails safe
 print("\nFAILS SAFE: an absent map keeps the legacy global protection")
-s = load({"MOSHTARAK_WIFI_PROTECT": "3"})
+s = load({"TONLY_MTTL_W01_PROTECT": "2"})
 ok(s.CONFIG["protect_by_device"] == {}, "no map configured")
-ok(s.is_protected_channel(3, SERVER_A) is True,
+ok(s.is_protected_channel(2, SERVER_A) is True,
    "server strip still protected by the legacy list")
-ok(s.is_protected_channel(3, SPARE_B) is True,
+ok(s.is_protected_channel(2, SPARE_B) is True,
    "spare over-protected rather than under-protected (the safe direction)")
-ok(s.is_protected_channel(3, None) is True,
+ok(s.is_protected_channel(2, None) is True,
    "an unknown device is protected, not assumed safe")
 
 print("\nFAILS SAFE: a typo'd device id does not unlock the server")
-s = load({"MOSHTARAK_WIFI_PROTECT_BY_DEVICE":
+s = load({"TONLY_MTTL_W01_PROTECT_BY_DEVICE":
           "2CFDB3355BA4=3"})          # one character wrong
 ok(s.CONFIG["protect_by_device"] == {"2CFDB3355BA4": [3]},
    "the typo is parsed (it is a valid id, just the wrong one)")
@@ -143,25 +143,25 @@ print("\nFAILS SAFE: BOTH settings present - the map decides, the list is the ne
 # as a fallback, because blanking it would remove the only thing standing between
 # a typo in the new setting and an unprotected server outlet: if the map ever
 # fails to parse, protection would fall back to an EMPTY list, not to [3].
-s = load({"MOSHTARAK_WIFI_PROTECT": "3",
-          "MOSHTARAK_WIFI_PROTECT_BY_DEVICE": "%s=3" % SERVER_A})
-ok(s.CONFIG["protect"] == [3], "the legacy list is still there as the net")
-ok(s.is_protected_channel(3, SERVER_A) is True,
+s = load({"TONLY_MTTL_W01_PROTECT": "2",
+          "TONLY_MTTL_W01_PROTECT_BY_DEVICE": "%s=2" % SERVER_A})
+ok(s.CONFIG["protect"] == [2], "the legacy list is still there as the net")
+ok(s.is_protected_channel(2, SERVER_A) is True,
    "the server strip is protected via the map")
-ok(s.is_protected_channel(3, SPARE_B) is False,
+ok(s.is_protected_channel(2, SPARE_B) is False,
    "the spare is still NOT protected - the map, not the list, decides")
 # ...and if the map is what breaks, the net catches it.
 s.CONFIG["protect_by_device"] = {}
-ok(s.is_protected_channel(3, SERVER_A) is True,
+ok(s.is_protected_channel(2, SERVER_A) is True,
    "with the map gone the legacy list takes over and the server is STILL locked")
-ok(s.is_protected_channel(3, SPARE_B) is True,
+ok(s.is_protected_channel(2, SPARE_B) is True,
    "the spare is then over-protected, which is the harmless direction")
 
 print("\nno false alarm when only the simulator is listed")
 # In auto mode the adapter lists the in-process simulator as device "SIM"
 # alongside real strips. Treating that placeholder as a known strip made every
 # restart shout that the server's protection id was a typo.
-s = load({"MOSHTARAK_WIFI_PROTECT_BY_DEVICE": "%s=3" % SERVER_A})
+s = load({"TONLY_MTTL_W01_PROTECT_BY_DEVICE": "%s=2" % SERVER_A})
 s.list_devices = lambda: [{"devid": "SIM", "simulated": True,
                            "connected": True}]
 buf = io.StringIO()
@@ -181,21 +181,21 @@ ok("locks socket [2]" in out and "MATCHES NO KNOWN STRIP" not in out,
    "once the real strip is listed it reports the lock, not a typo")
 
 print("\nFAILS SAFE: an unknown device is treated as protected")
-s = load({"MOSHTARAK_WIFI_PROTECT_BY_DEVICE": "%s=3" % SERVER_A})
-ok(sorted(s.protected_channels_for("")) == [3],
+s = load({"TONLY_MTTL_W01_PROTECT_BY_DEVICE": "%s=2" % SERVER_A})
+ok(sorted(s.protected_channels_for("")) == [2],
    "no device named -> union of all locks, not an empty set")
-ok(sorted(s.protected_channels_for(None)) == [3], "same for None")
+ok(sorted(s.protected_channels_for(None)) == [2], "same for None")
 
 # ------------------------------------------------------ save/load round trip
 print("\nthe map survives a save and reload")
 state = tempfile.mkdtemp()
-s = load({"MOSHTARAK_WIFI_PROTECT_BY_DEVICE":
-          "%s=3;%s=1" % (SERVER_A, SPARE_B), "MOSHTARAK_WIFI_STATE": state})
+s = load({"TONLY_MTTL_W01_PROTECT_BY_DEVICE":
+          "%s=3;%s=1" % (SERVER_A, SPARE_B), "TONLY_MTTL_W01_STATE": state})
 s._save_config()
 written = json.load(open(os.path.join(state, "config.json")))
 ok(written.get("protect_by_device") == {SERVER_A: [3], SPARE_B: [1]},
    "config.json records both strips")
-s2 = load({"MOSHTARAK_WIFI_STATE": state})
+s2 = load({"TONLY_MTTL_W01_STATE": state})
 s2.CONFIG["protect_by_device"] = {}
 s2.load_config()
 ok(s2.CONFIG["protect_by_device"] == {SERVER_A: [3], SPARE_B: [1]},
@@ -205,11 +205,11 @@ print("\nFAILS SAFE: a corrupt saved map does not clear protection")
 state = tempfile.mkdtemp()
 with open(os.path.join(state, "config.json"), "w") as fh:
     json.dump({"protect_by_device": {"2CFDB3355BA3": ["nonsense"]}}, fh)
-s3 = load({"MOSHTARAK_WIFI_PROTECT": "3", "MOSHTARAK_WIFI_STATE": state})
+s3 = load({"TONLY_MTTL_W01_PROTECT": "2", "TONLY_MTTL_W01_STATE": state})
 s3.load_config()
 ok(s3.CONFIG["protect_by_device"] == {},
    "an unusable saved map is discarded, leaving the legacy list in charge")
-ok(s3.is_protected_channel(3, SERVER_A) is True,
+ok(s3.is_protected_channel(2, SERVER_A) is True,
    "so the server outlet is still locked")
 
 print("\n%d passed, %d failed" % (PASS[0], PASS[1]))

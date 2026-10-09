@@ -10,7 +10,8 @@ Full option reference. For protocol background and honest limits, read the
 | Value | Behaviour |
 |---|---|
 | `auto` | Use a real strip if one connects; otherwise answer from the built-in simulator. **Default.** |
-| `tcp` | Real hardware only. With no strip connected, state reads fail honestly instead of returning simulator data. |
+| `mttl` | Real hardware only. With no strip connected, state reads fail honestly instead of returning simulator data. |
+| `tcp` | Legacy outbound guess (wrong way round for this device). Do not use. |
 | `sim` | Simulator only. Useful for developing automations with no hardware. |
 
 > **What `auto` really does with no hardware.** The simulator is always
@@ -20,14 +21,21 @@ Full option reference. For protocol background and honest limits, read the
 > trusts those flags alone would show four working switches that control nothing.
 > The Home Assistant integration therefore checks for a **real** (non-simulated)
 > strip explicitly, and will not present simulator output as your hardware. If
-> you would rather the controller refuse outright, use `tcp`.
+> you would rather the controller refuse outright, use `mttl`.
 
 ### `poll`
 
-Seconds between state reads, default `5`. The controller caches for this long,
+Seconds between state reads, default `2`. The controller caches for this long,
 so several clients polling do not each cause a fresh read of the strip. Relay
 state echoes back within 1–2 s, but **the physical relay can take up to 20 s to
 close**, so do not use a switch reading as a guarantee that power has arrived.
+
+### `order`
+
+Commissioned unit D8AA59D270AA is identity `[1, 2, 3, 4]` (blink-verified 2026-10-09).
+An earlier rotated reading `[2, 3, 4, 1]` was channel/socket confusion and is retired.
+If your strip measures differently, set it via `POST /api/config` and record it in
+the integration guard file `tonly_mttl_w01_socket_order.json`.
 
 ### `protect` / `protect_by_device`
 
@@ -39,7 +47,7 @@ restored.
 `protect_by_device` takes `DEV=ch,ch;DEV2=ch` and locks per strip:
 
 ```
-2CFDB3355BA3=3
+D8AA59D270AA=2  (identity order: socket 2 -> channel 2; server lives on socket 2)
 ```
 
 A strip with no entry is deliberately unprotected — that is what "leave the
@@ -54,22 +62,22 @@ lands on *protected*:
 
 Blanking `protect` means a typo in `protect_by_device` falls back to an **empty**
 list — the one direction that must never happen. The controller logs one line
-per boot, e.g. `protection: 2CFDB3355BA3 locks socket [2]`. If you instead see
+per boot, e.g. `protection: D8AA59D270AA locks socket [2]`. If you instead see
 `!! PROTECTION FOR <id> MATCHES NO KNOWN STRIP`, those sockets are **not** locked.
 
 ### `history_interval` / `history_keep_h`
 
 Sampling interval in seconds (default `20`) and retention in hours (default
-`48`). Stored in `history.db` under `/config/moshtarak-wifi/`, which is mapped so
+`48`). Stored in `history.db` under `/config/tonly-mttl-w01/`, which is mapped so
 it is included in Supervisor backups.
 
 ## State files
 
 | Path | Contents |
 |---|---|
-| `/config/moshtarak-wifi/config.json` | Runtime settings last saved through the API. **Beats the environment** — that is what the app last set. |
-| `/config/moshtarak-wifi/timers.json` | Timers. They run here, not in a phone app, so they fire when the phone is away. |
-| `/config/moshtarak-wifi/history.db` | SQLite history. |
+| `/config/tonly-mttl-w01/config.json` | Runtime settings last saved through the API. **Beats the environment** — that is what the app last set. |
+| `/config/tonly-mttl-w01/timers.json` | Timers. They run here, not in a phone app, so they fire when the phone is away. |
+| `/config/tonly-mttl-w01/history.db` | SQLite history. |
 
 ## Networks
 

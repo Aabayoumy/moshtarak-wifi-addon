@@ -3,13 +3,13 @@ configuration:
     name: TONLY MTTL-W01 WiFi
     options:
       mode: auto
-      poll: 5
+      poll: 2
       protect: ""
       protect_by_device: ""
       history_interval: 20
       history_keep_h: 48
     schema:
-      mode: list(auto|tcp|sim)?
+      mode: list(auto|mttl|tcp|sim)?
       poll: int(1,3600)?
       protect: str?
       protect_by_device: str?

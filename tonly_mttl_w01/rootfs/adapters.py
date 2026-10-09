@@ -1,5 +1,5 @@
 """
-Protocol adapters for the Moshtarak-Wifi controller (TONLY / MTTL-W01 strip).
+Protocol adapters for the TONLY MTTL-W01 controller (TONLY / MTTL-W01 strip).
 
 The wire protocol below was recovered from the vendor's own app
 (FG Link, com.fgmachines.rck 1.6.13) by decompiling its dex. It is a plain
@@ -788,7 +788,7 @@ class SimAdapter(Adapter):
 
     def __init__(self, path=None):
         self.path = path or os.environ.get(
-            "MOSHTARAK_WIFI_SIM_STATE", "/opt/moshtarak-wifi/sim-state.json")
+            "TONLY_MTTL_W01_SIM_STATE", "/opt/tonly-mttl-w01/sim-state.json")
         self._lock = threading.Lock()
 
     def _load(self):
@@ -916,7 +916,12 @@ class AutoAdapter(Adapter):
         try:
             return a.get_state(devid)
         except AdapterError:
-            if a is self.mttl and not devid:
+            # Fall back to the simulator only when no real strip exists at
+            # all. A connected-but-unsettled strip must surface as an error
+            # (so the controller reports unsettled), never as healthy sim data.
+            with self.mttl._lock:
+                live = len(self.mttl._devices) > 0
+            if a is self.mttl and not devid and not live:
                 return self.sim.get_state()
             raise
 
@@ -927,12 +932,25 @@ class AutoAdapter(Adapter):
             out.extend(self.sim.list_devices())
         return out
 
+    def resolve(self, devid=None):
+        with self.mttl._lock:
+            live = len(self.mttl._devices) > 0
+        if live:
+            return self.mttl.resolve(devid)
+        if devid:
+            raise AdapterError(
+                "no real MTTL strip is connected; cannot resolve %s" % devid)
+        return None
+
     def current_device(self, devid=None):
         with self.mttl._lock:
             live = len(self.mttl._devices) > 0
         return self.mttl.current_device(devid) if live else self.sim.current_device(devid)
 
     def set_switch(self, idx, on, devid=None):
+        if self.active is self.sim:
+            raise AdapterError(
+                "no real MTTL strip is connected; refusing to simulate a switch")
         return self.active.set_switch(idx, on, devid)
 
     def measure(self, devid=None, timeout=3.0):

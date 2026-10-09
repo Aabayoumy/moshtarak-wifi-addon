@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Moshtarak-Wifi - control service for the TONLY / MTTL-W01 multi-socket switch.
+TONLY MTTL-W01 - control service for the TONLY / MTTL-W01 multi-socket switch.
 
 Exposes a small JSON HTTP API that both the Home Assistant integration and the
 Android app use, hiding the device protocol behind adapters.get_adapter().
 
   GET  /api/health           service + adapter + device reachability
   GET  /api/state            current state of all four sockets
-  POST /api/switch/<id>      {"on": true|false}          -> set one outlet
+  POST /api/switch/<id>      LEGACY channel route, DO NOT USE from HA
   POST /api/switches         {"1": true, "2": false}     -> set several
   GET  /api/config           current configuration, including socket order
   POST /api/config           {"names": [...], "order": [...]} -> persist labels
@@ -23,16 +23,12 @@ Standard library only, so there is nothing to install or keep updated.
 
 SOCKET NUMBERING
 ----------------
-The device firmware numbers its relays 1..4 in its own order, which is NOT the
-order the sockets are physically arranged on the strip. On this unit the mapping
-was measured and confirmed twice (an LED on the socket lit in step with the
-firmware channel's current reading, and the server outlet stayed powered through
-every test while the mapped channel was never driven):
-
-    physical socket 1 -> firmware channel 2
-    physical socket 2 -> firmware channel 3   <-- the server lives here
-    physical socket 3 -> firmware channel 4
-    physical socket 4 -> firmware channel 1
+The device firmware numbers its relays 1..4. On the commissioned unit
+(D8AA59D270AA, fw 0.1.54-1.0.66) the mapping was re-verified 2026-10-09 by LED
+blink rounds, one socket at a time: physical socket N drives firmware channel N
+(identity [1,2,3,4]). An earlier rotated reading ([2,3,4,1]) was a channel/socket
+confusion and is no longer trusted. The live controller order is identity; see
+POST /api/config and the integration socket-order guard.
 
 Everything user-facing (the API, the app, timers, history) uses PHYSICAL socket
 numbers. The firmware channel is carried alongside as "channel" so nothing is
@@ -50,15 +46,22 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import adapters  # noqa: E402
 
-SERVICE = "moshtarak-wifi"
-STATE_DIR = os.environ.get("MOSHTARAK_WIFI_STATE", "/opt/moshtarak-wifi")
+SERVICE = "tonly-mttl-w01"
+STATE_DIR = os.environ.get("TONLY_MTTL_W01_STATE", "/opt/tonly-mttl-w01")
 STARTED = time.time()
 
 
 def env(name, default):
-    """Read MOSHTARAK_WIFI_<name>, falling back to the legacy TONLY_<name>."""
-    return os.environ.get("MOSHTARAK_WIFI_" + name,
-                          os.environ.get("TONLY_" + name, default))
+    """Read TONLY_MTTL_W01_<name>, falling back to the legacy TONLY_<name>."""
+    # A blank exported var (clearing an optional UI field exports "") must
+    # behave as unset, otherwise int()/float() below crash at import and the
+    # container crash-loops with a bare traceback before any log line.
+    val = os.environ.get("TONLY_MTTL_W01_" + name, None)
+    if val is None or (isinstance(val, str) and val.strip() == ""):
+        val = os.environ.get("TONLY_" + name, None)
+    if val is None or (isinstance(val, str) and val.strip() == ""):
+        return default
+    return val
 
 
 def _env_int_list(raw):
@@ -97,10 +100,10 @@ def _parse_protect_by_device(raw):
 
 
 def _default_order():
-    # Measured on this strip: physical socket N is firmware channel N+1, wrapping
-    # at 4. Written out longhand rather than computed so the mapping is visible
-    # to anyone reading this file.
-    return [2, 3, 4, 1]
+    # Commissioned unit D8AA59D270AA, verified 2026-10-09 by LED blink rounds:
+    # physical socket N drives firmware channel N (identity). Written out
+    # longhand so the mapping is visible to anyone reading this file.
+    return [1, 2, 3, 4]
 
 
 CONFIG = {
@@ -112,7 +115,7 @@ CONFIG = {
     # The strip dials *us* on this port once it has been provisioned, so this
     # is a listener, not a destination.
     "device_port": int(env("DEVICE_PORT", adapters.DEVICE_PORT)),
-    "poll": float(env("POLL", "5")),                   # seconds between state polls
+    "poll": float(env("POLL", "2")),                   # seconds between state polls
     # Which strip a request without ?device= refers to. Empty means "the most
     # recently connected one", so adding a second strip needs no reconfiguration.
     "device": env("DEVICE", "").strip(),
@@ -161,7 +164,7 @@ def adapter():
         _adapter = adapters.get_adapter(CONFIG["mode"], CONFIG["host"],
                                         CONFIG["port"], CONFIG["bind"],
                                         CONFIG["device_port"])
-        print("[moshtarak-wifi] adapter = %s" % _adapter.name, flush=True)
+        print("[tonly-mttl-w01] adapter = %s" % _adapter.name, flush=True)
     return _adapter
 
 
@@ -259,7 +262,7 @@ def decorate_devices(devs):
 def selected_device(explicit=None):
     """Which strip a bare request means.
 
-    Explicit ?device= wins, then MOSHTARAK_WIFI_DEVICE, then the most recently
+    Explicit ?device= wins, then TONLY_MTTL_W01_DEVICE, then the most recently
     connected strip (which is what resolve() does). With several strips up, the
     answer is reported in /api/state as "ambiguous" so nothing pretends the
     default was a deliberate choice.
@@ -536,7 +539,7 @@ def timer_thread():
                         t["last_run"] = int(time.time())
                         t["last_result"] = msg if ok else "refused: " + msg
                     save_timers()
-                    print("[moshtarak-wifi] timer %s -> %s" % (t.get("label") or t.get("id"), msg),
+                    print("[tonly-mttl-w01] timer %s -> %s" % (t.get("label") or t.get("id"), msg),
                           flush=True)
         except Exception as exc:
             note_error("timer_thread", exc)
@@ -601,9 +604,9 @@ def record_history(device=None):
 
 
 def history_thread():
-    keep = max(1.0, CONFIG["history_keep_h"]) * 3600
     while True:
         time.sleep(max(5.0, CONFIG["history_interval"]))
+        keep = max(1.0, CONFIG["history_keep_h"]) * 3600
         record_history()
         try:
             db = _db()
@@ -768,7 +771,7 @@ def diagnostics():
 
 PAGE = """<!doctype html><html><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
-<title>Moshtarak-Wifi</title>
+<title>TONLY MTTL-W01</title>
 <style>
  body{font-family:system-ui,sans-serif;background:#12151a;color:#e8ecf1;margin:0;
       padding:20px;max-width:560px;margin-inline:auto}
@@ -786,7 +789,7 @@ PAGE = """<!doctype html><html><head><meta charset=utf-8>
  .err{background:#5a2020;padding:10px;border-radius:9px;margin-bottom:12px;font-size:13px}
  .warn{color:#e0a355}
 </style></head><body>
-<h1>Moshtarak-Wifi multi-socket strip</h1>
+<h1>TONLY MTTL-W01 multi-socket strip</h1>
 <div class=sub id=sub>...</div>
 <div id=err></div>
 <h2>Sockets</h2>
@@ -831,11 +834,11 @@ refresh(); setInterval(refresh,4000);
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "moshtarak-wifi/2.0"
+    server_version = "tonly-mttl-w01/2.0"
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):
-        print("[moshtarak-wifi] %s - %s" % (self.address_string(), fmt % args), flush=True)
+        print("[tonly-mttl-w01] %s - %s" % (self.address_string(), fmt % args), flush=True)
 
     def _json(self, code, obj):
         body = json.dumps(obj).encode()
@@ -1013,7 +1016,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"ok": False, "error": "bad socket number"})
             return self._drive(channel, body, idx, device)
 
-        # --- single socket, by firmware channel (legacy, used by HA) ---
+        # --- single socket, by firmware channel (legacy, DO NOT USE from HA -- socket route only) ---
         if path.startswith("/api/switch/"):
             try:
                 idx = int(path.rsplit("/", 1)[1])
@@ -1193,7 +1196,7 @@ def _warn_about_protection_typos():
     by = CONFIG.get("protect_by_device") or {}
     if not by:
         if CONFIG["protect"]:
-            print("[moshtarak-wifi] protection: legacy global list %s applies to "
+            print("[tonly-mttl-w01] protection: legacy global list %s applies to "
                   "EVERY strip - socket %s protected on all of them"
                   % (CONFIG["protect"],
                      [c for c in (channel_to_socket(x) for x in CONFIG["protect"])
@@ -1202,7 +1205,7 @@ def _warn_about_protection_typos():
     try:
         known = _known_real_devices()
     except Exception as exc:
-        print("[moshtarak-wifi] protection self-check skipped: %s" % exc,
+        print("[tonly-mttl-w01] protection self-check skipped: %s" % exc,
               flush=True)
         return
     if not known:
@@ -1213,11 +1216,11 @@ def _warn_about_protection_typos():
     for devid, chans in sorted(by.items()):
         socks = [c for c in (channel_to_socket(x) for x in chans) if c is not None]
         if devid not in known:
-            print("[moshtarak-wifi] !! PROTECTION FOR %s MATCHES NO KNOWN STRIP - "
+            print("[tonly-mttl-w01] !! PROTECTION FOR %s MATCHES NO KNOWN STRIP - "
                   "those sockets are NOT locked. Known: %s"
                   % (devid, sorted(known) or "none yet"), flush=True)
         else:
-            print("[moshtarak-wifi] protection: %s locks socket %s"
+            print("[tonly-mttl-w01] protection: %s locks socket %s"
                   % (devid, socks), flush=True)
 
 
@@ -1241,12 +1244,12 @@ def _deferred_protection_check():
     # Nothing real turned up in five minutes. Now the silence IS the finding:
     # a protected strip that never registers means its sockets are not locked,
     # so say so rather than leaving it to be discovered.
-    print("[moshtarak-wifi] !! no real strip has registered after 5 minutes; "
+    print("[tonly-mttl-w01] !! no real strip has registered after 5 minutes; "
           "every configured lock is UNCONFIRMED", flush=True)
 
 
 def main():
-    print("[moshtarak-wifi] starting on %s:%d mode=%s device=%s:%d"
+    print("[tonly-mttl-w01] starting on %s:%d mode=%s device=%s:%d"
           % (CONFIG["bind"], CONFIG["listen"], CONFIG["mode"],
              CONFIG["host"], CONFIG["port"]), flush=True)
     load_config()

@@ -13,7 +13,7 @@ start". Two real failures got past that gap:
 Neither is visible from `docker build` succeeding. Both are visible from this.
 
 The port and the state directory are deliberately build-local: the real
-MOSHTARAK_WIFI_STATE is /config/moshtarak-wifi, which does not exist yet at
+TONLY_MTTL_W01_STATE is /config/tonly-mttl-w01, which does not exist yet at
 build time because /config is a bind mount supplied by the Supervisor when the
 app runs. Getting that wrong is why the build uses a throwaway directory.
 
@@ -23,7 +23,7 @@ build, which is the only place a maintainer will actually read about it.
 It can also be run outside a build, which is how it was tested before being
 trusted with the build:
 
-    MOSHTARAK_RUNTIME_DIR=tonly_mttl_w01 python3 tonly_mttl_w01/build_verify.py
+    TONLY_RUNTIME_DIR=tonly_mttl_w01 python3 tonly_mttl_w01/build_verify.py
 """
 from __future__ import annotations
 
@@ -45,8 +45,8 @@ REQUIRED = (
     "threading", "time",
 )
 
-RUNTIME_DIR = os.environ.get("MOSHTARAK_RUNTIME_DIR", "/opt/moshtarak-wifi")
-TEST_PORT = int(os.environ.get("MOSHTARAK_GATE_PORT", "8479"))
+RUNTIME_DIR = os.environ.get("TONLY_RUNTIME_DIR", "/opt/tonly-mttl-w01")
+TEST_PORT = int(os.environ.get("TONLY_GATE_PORT", "8479"))
 
 
 def fail(message: str) -> None:
@@ -79,9 +79,9 @@ def main() -> int:
     env = dict(os.environ)
     # sim, because there is no strip and never will be during a build. auto
     # would try to open the real callback port, which is meaningless here.
-    env["MOSHTARAK_WIFI_MODE"] = "sim"
-    env["MOSHTARAK_WIFI_LISTEN"] = str(TEST_PORT)
-    env["MOSHTARAK_WIFI_STATE"] = state_dir
+    env["TONLY_MTTL_W01_MODE"] = "sim"
+    env["TONLY_MTTL_W01_LISTEN"] = str(TEST_PORT)
+    env["TONLY_MTTL_W01_STATE"] = state_dir
 
     proc = subprocess.Popen(
         [sys.executable, "server.py"],
@@ -133,8 +133,8 @@ def main() -> int:
         # socket drives a different physical outlet, so it is worth failing a
         # build over rather than discovering it with real hardware attached.
         order = health.get("config", {}).get("order")
-        if order != [2, 3, 4, 1]:
-            fail(f"unexpected socket->channel order {order!r}, expected [2, 3, 4, 1]")
+        if order != [1, 2, 3, 4]:
+            fail(f"unexpected socket->channel order {order!r}, expected [1, 2, 3, 4]")
 
         if proc.poll() is not None:
             fail("the controller exited between answering and being inspected")

@@ -6,8 +6,8 @@ parses proves nothing about whether the app will start. What actually breaks an
 add-on of this shape is the seam between three files:
 
     config.yaml  declares options + schema keys
-    run.sh       reads them with bashio::config and exports MOSHTARAK_WIFI_* vars
-    server.py    reads MOSHTARAK_WIFI_* vars through its env() helper
+    run.sh       reads them with bashio::config and exports TONLY_MTTL_W01_* vars
+    server.py    reads TONLY_MTTL_W01_* vars through its env() helper
 
 If a schema key is renamed, or run.sh exports a variable the controller never
 reads, or a required option is missing, the app starts and then behaves wrongly
@@ -109,35 +109,35 @@ def main() -> int:
 
     print("\n2. run.sh -> controller environment")
 
-    # MOSHTARAK_WIFI_<X> exported by run.sh must be one the controller reads.
+    # TONLY_MTTL_W01_<X> exported by run.sh must be one the controller reads.
     # There are two ways it reads one, and a test that only knows about the
-    # first reports a false failure on MOSHTARAK_WIFI_STATE - which is read
+    # first reports a false failure on TONLY_MTTL_W01_STATE - which is read
     # directly with os.environ.get, not through the env() helper:
     #
     #   server.py:60   def env(name, default)  ->  env("MODE", "auto")
-    #   server.py:54   STATE_DIR = os.environ.get("MOSHTARAK_WIFI_STATE", ...)
+    #   server.py:54   STATE_DIR = os.environ.get("TONLY_MTTL_W01_STATE", ...)
     server_src = SERVER.read_text()
     adapters_src = ADAPTERS.read_text()
     read_envs = set(re.findall(r'env\(\s*"([A-Z_]+)"', server_src))
     read_envs |= set(
         re.findall(
-            r'os\.environ\.get\(\s*"MOSHTARAK_WIFI_([A-Z_]+)"',
+            r'os\.environ\.get\(\s*"TONLY_MTTL_W01_([A-Z_]+)"',
             server_src + adapters_src,
         )
     )
-    exported = set(re.findall(r'export\s+MOSHTARAK_WIFI_([A-Z_]+)=', body))
+    exported = set(re.findall(r'export\s+TONLY_MTTL_W01_([A-Z_]+)=', body))
 
     for name in sorted(exported):
         check(
             name in read_envs,
-            f"MOSHTARAK_WIFI_{name} is read by the controller",
+            f"TONLY_MTTL_W01_{name} is read by the controller",
             f"server.py reads: {sorted(read_envs)}",
         )
 
     # The one variable that must NOT be driven from options: the state dir is
     # fixed to a mapped path so history survives a container rebuild.
     check(
-        'MOSHTARAK_WIFI_STATE="/config/moshtarak-wifi"' in body,
+        'TONLY_MTTL_W01_STATE="/config/tonly-mttl-w01"' in body,
         "state dir is pinned to the mapped /config path",
     )
     check(
@@ -151,7 +151,7 @@ def main() -> int:
     # it and the per-strip map.
     for line in body.splitlines():
         stripped = line.strip()
-        if stripped.startswith("export MOSHTARAK_WIFI_PROTECT="):
+        if stripped.startswith("export TONLY_MTTL_W01_PROTECT="):
             check(
                 "bashio::config" in stripped,
                 "legacy PROTECT is passed through, not blanked",
@@ -180,13 +180,13 @@ def main() -> int:
             continue
         # Feed the schema default exactly as bashio would hand it over.
         value = options.get(name.lower())
-        env[f"MOSHTARAK_WIFI_{name}"] = "" if value is None else str(value)
+        env[f"TONLY_MTTL_W01_{name}"] = "" if value is None else str(value)
 
-    env["MOSHTARAK_WIFI_MODE"] = "sim"  # no hardware here by definition
-    env["MOSHTARAK_WIFI_LISTEN"] = str(TEST_PORT)
+    env["TONLY_MTTL_W01_MODE"] = "sim"  # no hardware here by definition
+    env["TONLY_MTTL_W01_LISTEN"] = str(TEST_PORT)
 
     state_dir = tempfile.mkdtemp(prefix="addon-contract-")
-    env["MOSHTARAK_WIFI_STATE"] = state_dir
+    env["TONLY_MTTL_W01_STATE"] = state_dir
 
     # Run from a COPY of the runtime files, not from the payload directory.
     # Launching in-place let the interpreter drop __pycache__ into the add-on
@@ -237,7 +237,7 @@ def main() -> int:
                 "the listen port reached the controller",
             )
             check(
-                health.get("config", {}).get("order") == [2, 3, 4, 1],
+                health.get("config", {}).get("order") == [1, 2, 3, 4],
                 "the measured socket->channel order is intact",
                 f"got {health.get('config', {}).get('order')!r}",
             )
@@ -378,7 +378,7 @@ def main() -> int:
             if _dst.startswith("/opt/"):
                 copied_paths.add(_dst.rstrip("/"))
         runtime_def = re.search(
-            r'RUNTIME_DIR\s*=\s*os\.environ\.get\(\s*"MOSHTARAK_RUNTIME_DIR"\s*,\s*"([^"]+)"\s*\)',
+            r'RUNTIME_DIR\s*=\s*os\.environ\.get\(\s*"TONLY_RUNTIME_DIR"\s*,\s*"([^"]+)"\s*\)',
             gate.read_text(),
         )
         check(
@@ -386,10 +386,10 @@ def main() -> int:
             "build_verify's default RUNTIME_DIR is one of the Dockerfile's /opt COPY targets",
         )
 
-    # MOSHTARAK_WIFI_STATE must stay on the mapped /config path: that is what
+    # TONLY_MTTL_W01_STATE must stay on the mapped /config path: that is what
     # puts history.db inside Home Assistant's own backups.
     check(
-        "MOSHTARAK_WIFI_STATE=/config/moshtarak-wifi" in DOCKERFILE.read_text(),
+        "TONLY_MTTL_W01_STATE=/config/tonly-mttl-w01" in DOCKERFILE.read_text(),
         "state dir is on the mapped /config path, so history.db is backed up",
     )
 

@@ -37,14 +37,14 @@ def get(path):
 
 env = dict(os.environ)
 env.update({
-    "MOSHTARAK_WIFI_MODE": "sim",
-    "MOSHTARAK_WIFI_LISTEN": str(PORT),
-    "MOSHTARAK_WIFI_BIND": "127.0.0.1",
-    "MOSHTARAK_WIFI_STATE": STATE,
-    "MOSHTARAK_WIFI_SIM_STATE": os.path.join(STATE, "sim-state.json"),
+    "TONLY_MTTL_W01_MODE": "sim",
+    "TONLY_MTTL_W01_LISTEN": str(PORT),
+    "TONLY_MTTL_W01_BIND": "127.0.0.1",
+    "TONLY_MTTL_W01_STATE": STATE,
+    "TONLY_MTTL_W01_SIM_STATE": os.path.join(STATE, "sim-state.json"),
     # Channel 3 == physical socket 2 == the server. Protected exactly as live.
-    "MOSHTARAK_WIFI_PROTECT": "3",
-    "MOSHTARAK_WIFI_POLL": "0",
+    "TONLY_MTTL_W01_PROTECT": "3",
+    "TONLY_MTTL_W01_POLL": "0",
 })
 
 proc = subprocess.Popen([sys.executable, os.path.join(HERE, "server.py")],
