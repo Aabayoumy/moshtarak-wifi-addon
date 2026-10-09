@@ -236,22 +236,29 @@ class MacWifi(WifiBackend):
     _AIRPORT = ("/System/Library/PrivateFrameworks/Apple80211.framework/"
                 "Resources/airport")
 
-    def _service(self):
-        # "Wi-Fi" service name from the hardware port list; fall back literal.
+    def _port(self):
+        """(service, device) of the Wi-Fi hardware port, e.g. ("Wi-Fi", "en0").
+
+        The service may be renamed by the user, so read it instead of assuming
+        "Wi-Fi": passing a wrong name to -setairportnetwork fails with the
+        confusing "not a Wi-Fi interface" error.
+        """
         try:
             out = _run(("networksetup", "-listallhardwareports")).stdout
         except WifiError:
-            return "Wi-Fi"
-        dev = None
+            return "Wi-Fi", "en0"
+        pairs = []
+        name = None
         for line in out.splitlines():
             if line.startswith("Hardware Port:"):
-                dev = None
-                want = line.split(":", 1)[1].strip().lower() == "wi-fi"
-                if want:
-                    dev = "want"
-            elif dev == "want" and line.startswith("Device:"):
-                return "Wi-Fi"  # service name IS "Wi-Fi"; device (en0) unused
-        return "Wi-Fi"
+                name = line.split(":", 1)[1].strip()
+            elif line.startswith("Device:") and name:
+                pairs.append((name, line.split(":", 1)[1].strip()))
+                name = None
+        for svc, dev in pairs:
+            if svc.lower().replace("-", "") in ("wifi", "airport"):
+                return svc, dev
+        return "Wi-Fi", "en0"
 
     def scan(self):
         if not os.path.exists(self._AIRPORT):
@@ -268,14 +275,19 @@ class MacWifi(WifiBackend):
         return ssids
 
     def current(self):
-        out = _run(("networksetup", "-getairportnetwork", "en0")).stdout.strip()
+        _, dev = self._port()
+        out = _run(("networksetup", "-getairportnetwork", dev)).stdout.strip()
         m = re.match(r"Current Wi-Fi Network:\s*(.+)", out)
         if m:
             return m.group(1).strip()
         return None
 
     def connect(self, ssid, password=None):
-        argv = ["networksetup", "-setairportnetwork", self._service(), ssid]
+        svc, dev = self._port()
+        # A powered-off radio fails the join with "not a Wi-Fi interface",
+        # which reads like a wrong name. Power on first; harmless if already on.
+        _run(("networksetup", "-setairportpower", dev, "on"), timeout=15)
+        argv = ["networksetup", "-setairportnetwork", svc, ssid]
         if password:
             argv.append(password)
         proc = _run(argv, timeout=30)
