@@ -22,30 +22,46 @@ something the strip will misparse.
 After `up:reboot:0` the strip reboots onto your Wi-Fi and dials
 `<the address you gave it>:10086`, where the add-on is already listening.
 
-## Steps
+## Steps (automatic)
 
-1. Find the strip's setup network. It is `TONLY_TAP_<suffix>` or
-   `ONLY_TAP_<suffix>`; the passphrase is `LGU_<suffix>`. Many phones will not
-   show you nearby network names unless **Location services** are on — an empty
-   list means the system would not tell us, not that nothing is there.
-2. Join that network from a laptop or phone.
-3. Run the script, passing the address the strip should call back. **Use the
-   Home Assistant host's LAN address**, not the add-on's internal one — the strip
-   has to dial in from outside:
+Run the script on a laptop with Wi-Fi (macOS, Linux with NetworkManager, or
+Windows — standard library only, no installs). It scans for the strip, joins
+its setup AP, provisions it, and rejoins your home Wi-Fi by itself:
 
-   ```sh
-   python3 tools/provision.py \
-     --ssid "YourWiFi" --password "yourpassword" \
-     --ap TONLY_TAP_3355BA3 \
-     --controller 192.168.1.50
-   ```
+```sh
+python3 tools/provision.py --save
+```
 
-   `--controller` is the Home Assistant machine's address on your LAN.
-4. Watch the strip appear:
+With no flags it prompts for the three things it cannot know: your home
+SSID, its password (hidden), and the controller IP. `--save` remembers them
+in `~/.config/tonly-mttl-w01/provision.conf` (mode 600) so the next strip is
+a single command. Flags beat the file; the file beats a prompt:
 
-   ```sh
-   curl -s http://192.168.1.50:8099/api/devices | python3 -m json.tool
-   ```
+```sh
+python3 tools/provision.py --ssid "YourWiFi" --password "yourpassword" \
+  --controller 192.168.1.50 --save
+```
+
+`--controller` is the Home Assistant host's LAN address, not the add-on's
+internal hostname — the strip dials in from outside. The prompt suggests
+`homeassistant.local` when it resolves. Then watch the strip appear **from
+the HA host** (port 8099 is internal-only and refuses laptops on the LAN):
+
+```sh
+curl -s http://192.168.1.50:8099/api/devices | python3 -m json.tool
+```
+
+Manual overrides for odd cases: `--ap TONLY_TAP_xxxx` skips the scan,
+`--gateway` overrides the strip IP, `--no-rejoin` stays on the setup AP,
+`--no-verify` skips the controller check, `--reboot` also sends
+`up:reboot:0` (normally omitted — the strip reboots itself).
+
+Per-OS notes: newer macOS removed the `airport` scanner, so there the strip
+AP name comes from `--ap` (joining still works; may need `sudo`). Linux
+needs `nmcli`. Windows joins via a temporary WPA2 profile that is deleted
+afterwards. Many phones will not show nearby network names unless
+**Location services** are on — an empty scan means the system would not tell
+us, not that nothing is there.
 
 ## Two warnings
 
