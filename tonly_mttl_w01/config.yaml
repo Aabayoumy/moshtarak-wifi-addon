@@ -1,6 +1,6 @@
 ---
 name: TONLY MTTL-W01 WiFi
-version: "1.0.3"
+version: "1.0.4"
 slug: tonly_mttl_w01
 description: >-
   Controls TONLY / LG-U+ MTTL-W01 four-socket Wi-Fi power strips over the
