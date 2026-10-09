@@ -293,19 +293,36 @@ class MacWifi(WifiBackend):
         argv = ["networksetup", "-setairportnetwork", dev, ssid]
         if password:
             argv.append(password)
-        proc = _run(argv, timeout=30)
-        out = ((proc.stdout or "") + "\n" + (proc.stderr or "")).strip()
-        # networksetup can exit 0 while printing failure ("Could not find
-        # network ..."), so judge by the text, not just the return code.
-        if proc.returncode != 0 or "could not" in out.lower() or "** error" in out:
+        # networksetup joins from a cached scan list, so a network that only
+        # just appeared ("Could not find network") can succeed seconds later
+        # once the cache refreshes - the Wi-Fi menu sees it first because the
+        # GUI scans continuously and the CLI does not. Retry before giving up.
+        last_out, last_rc = "", 0
+        for attempt in (1, 2, 3):
+            proc = _run(argv, timeout=30)
+            last_out = ((proc.stdout or "") + "\n" + (proc.stderr or "")).strip()
+            last_rc = proc.returncode
+            # networksetup can exit 0 while printing failure ("Could not find
+            # network ..."), so judge by the text, not just the return code.
+            if last_rc == 0 and "could not" not in last_out.lower() \
+                    and "** error" not in last_out:
+                break
+            if "could not find network" in last_out.lower() and attempt < 3:
+                print("  join attempt %d: network not in scan cache yet, "
+                      "waiting 8s ..." % attempt)
+                time.sleep(8)
+        else:
+            pass
+        out, proc_returncode = last_out, last_rc
+        if proc_returncode != 0 or "could not" in out.lower() or "** error" in out:
             err = out
             if "could not find network" in err.lower():
-                raise WifiError("the Mac's Wi-Fi cannot see %r right now: "
-                                "the strip is not in pairing mode, is out of range, "
-                                "or is already provisioned (provisioned strips stop "
-                                "broadcasting). Hold this machine within a few meters, "
-                                "confirm the slow blink, and check the Wi-Fi menu "
-                                "shows the name before retrying." % ssid)
+                raise WifiError("the Mac's Wi-Fi still cannot see %r after 3 tries "
+                                "(yet the Wi-Fi menu may show it - the menu scans "
+                                "continuously, the CLI cache lags). Workaround that "
+                                "always works: join it once from the Wi-Fi menu by "
+                                "hand, then re-run this script - it detects it is "
+                                "already on the setup AP and continues." % ssid)
             if "not associated" in err or "could not" in err.lower():
                 hint = (" (tip: macOS may ask for an admin password to change "
                         "Wi-Fi; re-run with sudo)")
